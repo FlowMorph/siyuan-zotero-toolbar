@@ -49,6 +49,8 @@ export const ICONS = {
         '<path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/>',
     ),
     close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
+    closeCircle: svg('<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>'),
+    menu: svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
     collapse: svg('<path d="m9 5 7 7-7 7"/>'),
     pencilHandle: svg(
         '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z" fill="currentColor" stroke="none"/>' +

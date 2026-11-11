@@ -1,7 +1,5 @@
 {
   "topbarTitle": "Zotero Toolbar (annotation mode)",
-  "modeOn": "Annotation mode on: draw, shapes, sticky notes. Esc to exit",
-  "modeOff": "Annotation mode off; sticky notes stay clickable",
   "toolPen": "Pen",
   "toolHighlighter": "Highlighter",
   "toolEraser": "Eraser",
@@ -63,10 +61,11 @@
   "shapeEllipse": "Ellipse",
   "shapeLine": "Line",
   "shapeArrow": "Arrow",
-  "noteToolHint": "Click to place a note, or drag a doc/block in from the doc tree or another tab",
   "noteDelete": "Delete note",
   "noteEditHint": "Click to edit",
   "notePlaceholder": "Write a note… paste a block ref ((id 'title')) or a URL",
   "shape": "Shapes",
-  "note": "Sticky note"
+  "note": "Sticky note",
+  "toolOptions": "Color & size",
+  "more": "More"
 }

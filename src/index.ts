@@ -83,7 +83,7 @@ export default class PencilAnnotationPlugin extends Plugin {
             hlColor: session.hlColor || this.settings.hlColor,
             hlWidth: session.hlWidth || this.settings.hlWidth,
             shape: SHAPES.includes(session.shape as ShapeKind) ? (session.shape as ShapeKind) : "rect",
-            shapeColor: session.shapeColor || "#e03131",
+            shapeColor: session.shapeColor || "#ff6666",
             shapeWidth: session.shapeWidth || 3,
             noteColor: session.noteColor || NOTE_COLORS[0],
         };
@@ -271,7 +271,6 @@ export default class PencilAnnotationPlugin extends Plugin {
             overlay.setMode(this.modeOn);
         }
         this.palette.setMode(this.modeOn);
-        showMessage(this.t(this.modeOn ? "modeOn" : "modeOff"));
     }
 
     private togglePenEraser() {

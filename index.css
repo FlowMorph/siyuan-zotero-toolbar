@@ -45,23 +45,21 @@
 .zt-handle {
     position: fixed;
     z-index: 1000;
-    width: 46px;
-    height: 46px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: none;
+    border: 1px solid var(--b3-border-color, rgba(0, 0, 0, 0.1));
     padding: 0;
-    background: rgba(28, 28, 32, 0.88);
-    color: #fff;
+    background: var(--b3-theme-background, #fff);
+    color: var(--b3-theme-primary, #3575f0);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
     touch-action: none;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }
 
 .zt-handle:active {
@@ -69,56 +67,68 @@
 }
 
 .zt-handle svg {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
 }
 
-/* drawing-mode-on look */
 .zt-handle--on {
-    background: #6366f1;
+    background: var(--b3-theme-primary, #3575f0);
+    color: #fff;
 }
 
-/* ---------- floating toolbar palette ---------- */
+/* ---------- Zotero-style vertical toolbar ---------- */
 .zt-toolbar {
     position: fixed;
     z-index: 1001;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 2px;
-    padding: 6px;
-    border-radius: 16px;
-    background: rgba(28, 28, 32, 0.92);
-    color: #fff;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+    gap: 4px;
+    width: 48px;
+    box-sizing: border-box;
+    padding: 4px 6px 8px;
+    border-radius: 14px;
+    border: 1px solid var(--b3-border-color, rgba(0, 0, 0, 0.08));
+    background: var(--b3-theme-background, #fff);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
 }
 
-.zt-toolbar__group {
-    display: flex;
-    align-items: center;
-    gap: 2px;
+/* drag handle: the only non-button area of the toolbar */
+.zt-toolbar__grip {
+    width: 100%;
+    height: 12px;
+    cursor: grab;
+    position: relative;
 }
 
-.zt-toolbar__sep {
-    width: 1px;
-    height: 22px;
-    margin: 0 4px;
-    background: rgba(255, 255, 255, 0.16);
+.zt-toolbar__grip::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 5px;
+    width: 18px;
+    height: 3px;
+    margin-left: -9px;
+    border-radius: 2px;
+    background: var(--b3-border-color, rgba(0, 0, 0, 0.15));
+}
+
+.zt-toolbar__spacer {
+    height: 18px;
     flex: none;
 }
 
 .zt-btn {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border: none;
-    border-radius: 11px;
+    border-radius: 9px;
     padding: 0;
     background: transparent;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--b3-theme-primary, #3575f0);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -132,17 +142,19 @@
     pointer-events: none;
 }
 
-.zt-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+.zt-btn:hover,
+.zt-btn--open {
+    background: var(--b3-list-hover, rgba(0, 0, 0, 0.06));
 }
 
-.zt-btn--active {
-    background: #6366f1;
+.zt-btn--active,
+.zt-btn--active:hover {
+    background: var(--b3-theme-primary, #3575f0);
     color: #fff;
 }
 
 .zt-btn:disabled {
-    opacity: 0.32;
+    opacity: 0.35;
     cursor: default;
 }
 
@@ -150,157 +162,139 @@
     background: transparent;
 }
 
-/* tool options row (colors / widths) */
-.zt-toolbar__options {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 4px;
-    max-width: 46vw;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.zt-toolbar__options::-webkit-scrollbar {
-    display: none;
-}
-
-.zt-swatch {
+/* current color of the active tool; opens the options popover */
+.zt-dot {
+    display: block;
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    border: 2px solid transparent;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+}
+
+.zt-dot--hollow {
+    box-shadow: inset 0 0 0 2px var(--b3-theme-on-surface-light, #aaa);
+}
+
+/* ---------- secondary popover (colors / size / shape kind, menu) ---------- */
+.zt-pop {
+    position: fixed;
+    z-index: 1002;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid var(--b3-border-color, rgba(0, 0, 0, 0.08));
+    background: var(--b3-theme-background, #fff);
+    color: var(--b3-theme-on-background, #222);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+}
+
+/* arrow pointing at the anchor button */
+.zt-pop::before {
+    content: "";
+    position: absolute;
+    left: -7px;
+    top: calc(var(--zt-pop-arrow, 50%) - 7px);
+    width: 12px;
+    height: 12px;
+    background: inherit;
+    border-left: 1px solid var(--b3-border-color, rgba(0, 0, 0, 0.08));
+    border-bottom: 1px solid var(--b3-border-color, rgba(0, 0, 0, 0.08));
+    transform: rotate(45deg);
+}
+
+.zt-pop--left::before {
+    left: auto;
+    right: -7px;
+    transform: rotate(-135deg);
+}
+
+.zt-pop__row {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.zt-pop__colors {
+    display: grid;
+    grid-template-columns: repeat(4, 34px);
+    gap: 12px;
+}
+
+.zt-swatch {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
     padding: 0;
+    background: var(--zt-swatch);
     cursor: pointer;
-    flex: none;
-    position: relative;
 }
 
 .zt-swatch--active {
-    border-color: #fff;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+    box-shadow: inset 0 0 0 3px var(--b3-theme-background, #fff), 0 0 0 2px var(--zt-swatch);
 }
 
-/* rheostat-style width slider (pen / highlighter / eraser) */
 .zt-width {
     display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 0 6px;
-    flex: none;
+    gap: 10px;
 }
 
-.zt-width__dot {
-    display: block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    flex: none;
-}
-
-.zt-width__slider {
-    position: relative;
-    width: 104px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    flex: none;
+.zt-pop__colors + .zt-width {
+    margin-top: 14px;
 }
 
 .zt-width input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 104px;
-    height: 22px;
+    flex: 1;
+    min-width: 120px;
     margin: 0;
-    padding: 0;
-    background: transparent;
+    accent-color: var(--b3-theme-primary, #3575f0);
     cursor: pointer;
-    touch-action: none;
 }
 
-.zt-width input[type="range"]::-webkit-slider-runnable-track {
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.28);
-}
-
-.zt-width input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    margin-top: -5px;
-    border-radius: 50%;
-    background: #6366f1;
-    border: 2px solid #fff;
-    box-sizing: border-box;
-}
-
-.zt-width__val {
-    font-size: 11px;
-    line-height: 1;
-    color: rgba(255, 255, 255, 0.65);
-    min-width: 18px;
-    text-align: left;
+.zt-width__preview {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex: none;
 }
 
-/* selection action buttons shown while a stroke is selected */
-.zt-toolbar__selection {
+.zt-width__preview i {
+    display: block;
+    border-radius: 50%;
+}
+
+.zt-pop--menu {
+    padding: 6px;
+}
+
+.zt-pop__item {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 12px 8px 8px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
 }
 
-/* ---------- docked (vertical) toolbar for left/right edges ---------- */
-.zt-toolbar--vertical {
-    flex-direction: column;
-    padding: 6px 5px;
+.zt-pop__item:hover {
+    background: var(--b3-list-hover, rgba(0, 0, 0, 0.06));
 }
 
-.zt-toolbar--vertical .zt-toolbar__group,
-.zt-toolbar--vertical .zt-toolbar__selection {
-    flex-direction: column;
-}
-
-.zt-toolbar--vertical .zt-toolbar__sep {
-    width: 24px;
-    height: 1px;
-    margin: 4px 0;
-}
-
-.zt-toolbar--vertical .zt-toolbar__options {
-    flex-direction: column;
-    max-width: none;
-    max-height: 38vh;
-    overflow-y: auto;
-    padding: 4px 0;
-}
-
-.zt-toolbar--vertical .zt-toolbar__options span {
-    writing-mode: initial;
-}
-
-/* vertical (docked left/right): rotate the slider to run along the edge */
-.zt-toolbar--vertical .zt-width {
-    flex-direction: column;
-    gap: 5px;
-    padding: 4px 0;
-}
-
-.zt-toolbar--vertical .zt-width__slider {
-    width: 22px;
-    height: 104px;
-}
-
-.zt-toolbar--vertical .zt-width input[type="range"] {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    /* min (thin) at the bottom, max (thick) at the top */
-    transform: translate(-50%, -50%) rotate(90deg);
+.zt-pop__item svg {
+    width: 18px;
+    height: 18px;
+    color: var(--b3-theme-primary, #3575f0);
+    flex: none;
 }
 
 /* ---------- topbar icon ---------- */
@@ -312,6 +306,7 @@ svg.zt-topbar-svg {
 /* SiYuan's base.css ships a bare `svg { fill: currentcolor }` that overrides our
    fill="none" attribute and turns every stroke icon into a solid blob. */
 .zt-toolbar svg,
+.zt-pop svg,
 .zt-handle svg,
 svg.zt-topbar-svg {
     fill: none;
@@ -339,26 +334,6 @@ svg.zt-topbar-svg {
 }
 .zt-export__note { margin-top: 8px; font-size: 12px; }
 .zt-export__pdf { width: 100%; justify-content: center; margin-top: 2px; }
-
-/* ---------- shape kinds / note tool options ---------- */
-
-.zt-btn--small {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-}
-
-.zt-btn--small svg {
-    width: 18px;
-    height: 18px;
-}
-
-.zt-toolbar__hint {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.65);
-    white-space: nowrap;
-    padding-left: 4px;
-}
 
 /* ---------- sticky notes ---------- */
 

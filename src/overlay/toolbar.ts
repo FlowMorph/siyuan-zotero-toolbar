@@ -3,8 +3,9 @@ import type {OverlayConfig, OverlaySettings} from "./overlay";
 import {ICONS} from "./icons";
 import {NOTE_COLORS} from "./notes";
 
-export const PEN_COLORS = ["#1e1e1e", "#e03131", "#2f6fed", "#2f9e44", "#f76707", "#9c36b5"];
-export const HL_COLORS = ["#ffd400", "#ff922b", "#69db7c", "#4dabf7", "#f783ac"];
+/** pen/shape palette: Zotero's grid with gray swapped for black (ink needs black) */
+export const PEN_COLORS = ["#1e1e1e", "#ff6666", "#5fb236", "#2ea8e5", "#a28ae5", "#e56eee", "#f19837", "#ffd400"];
+export const HL_COLORS = NOTE_COLORS;
 
 /** slider ranges for stroke width / eraser size — pen max is settings-driven */
 export const WIDTH_RANGE = {
@@ -41,24 +42,9 @@ export interface PaletteDeps {
     onHandleActivate: () => void;
 }
 
-const POS_KEY = "zotero-toolbar.toolbar-pos";
-const DOCK_KEY = "zotero-toolbar.toolbar-dock";
+const POS_KEY = "zotero-toolbar.toolbar-pos-v2";
 const HANDLE_POS_KEY = "zotero-toolbar.handle-pos";
-
-type Dock = "free" | "top" | "bottom" | "left" | "right";
-const DOCK_SNAP = 34;   // px from an edge that triggers docking
-const DOCK_MARGIN = 4;  // gap between a docked toolbar and the screen edge
-
-const loadDock = (): Dock => {
-    const v = localStorage.getItem(DOCK_KEY);
-    return v === "top" || v === "bottom" || v === "left" || v === "right" ? v : "free";
-};
-
-const saveDock = (dock: Dock) => {
-    try {
-        localStorage.setItem(DOCK_KEY, dock);
-    } catch { /* ignore */ }
-};
+const POPOVER_GAP = 10;
 
 const loadPos = (key: string): { x: number; y: number } | null => {
     try {
@@ -76,6 +62,13 @@ const savePos = (key: string, pos: { x: number; y: number }) => {
     } catch { /* ignore */ }
 };
 
+type PopoverKind = "options" | "menu";
+
+/**
+ * Zotero-style vertical toolbar: icon-only tools, one color dot that opens a
+ * secondary popover (color grid, width, shape kind), then undo / redo /
+ * close / menu at the bottom.
+ */
 export class Palette {
     readonly toolbar: HTMLDivElement;
     readonly handle: HTMLButtonElement;
@@ -83,7 +76,8 @@ export class Palette {
     private readonly deps: PaletteDeps;
     private state: PaletteState = {mode: false, canUndo: false, canRedo: false, hasSelection: false};
     private suppressClick = false;
-    private dock: Dock = loadDock();
+    private popover: HTMLDivElement | null = null;
+    private popoverKind: PopoverKind | null = null;
 
     constructor(deps: PaletteDeps) {
         this.deps = deps;
@@ -99,93 +93,44 @@ export class Palette {
         this.handle.style.display = "none";
         document.body.appendChild(this.handle);
 
-        this.restorePositions();
         this.bindDragging();
         this.handle.addEventListener("click", () => {
             if (!this.suppressClick) this.deps.onHandleActivate();
             this.suppressClick = false;
         });
         this.renderToolbar();
+        this.restorePositions();
     }
 
     // -------------------------------------------------------------- layout
 
     private restorePositions() {
-        this.applyDockClass();
         const pos = loadPos(POS_KEY);
         if (pos) this.place(this.toolbar, pos);
         else this.defaultToolbarPos();
-        this.snapToDock();
         const hpos = loadPos(HANDLE_POS_KEY);
         if (hpos) this.place(this.handle, hpos);
-        else this.defaultHandlePos();
+        else this.place(this.handle, {x: window.innerWidth - 62, y: Math.max(80, window.innerHeight * 0.3)});
     }
 
-    private applyDockClass() {
-        this.toolbar.classList.toggle(
-            "zt-toolbar--vertical",
-            this.dock === "left" || this.dock === "right",
-        );
-    }
-
+    /** left side, vertically centred — where Zotero keeps it */
     private defaultToolbarPos() {
-        this.place(this.toolbar, {x: window.innerWidth - 320, y: 16});
-    }
-
-    private defaultHandlePos() {
-        this.place(this.handle, {x: window.innerWidth - 62, y: Math.max(80, window.innerHeight * 0.3)});
+        const h = this.toolbar.offsetHeight || 480;
+        this.place(this.toolbar, {x: 56, y: (window.innerHeight - h) / 2});
     }
 
     /** viewport is `fixed`-positioned: x/y are the top-left corner */
     private place(el: HTMLElement, pos: { x: number; y: number }) {
-        const w = el.offsetWidth || 60;
+        const w = el.offsetWidth || 52;
         const h = el.offsetHeight || 46;
         const x = Math.min(Math.max(8, pos.x), Math.max(8, window.innerWidth - w - 8));
         const y = Math.min(Math.max(8, pos.y), Math.max(8, window.innerHeight - h - 8));
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
-        el.style.right = "auto";
-        el.style.bottom = "auto";
     }
 
-    /** clamps a docked toolbar flush against its edge, sliding along it */
-    private snapToDock() {
-        if (this.dock === "free") return;
-        const el = this.toolbar;
-        this.applyDockClass();
-        const w = el.offsetWidth || 60;
-        const h = el.offsetHeight || 46;
-        const cur = {x: parseFloat(el.style.left || "0"), y: parseFloat(el.style.top || "0")};
-        let x = cur.x, y = cur.y;
-        if (this.dock === "left") x = DOCK_MARGIN;
-        else if (this.dock === "right") x = window.innerWidth - w - DOCK_MARGIN;
-        else if (this.dock === "top") y = DOCK_MARGIN;
-        else if (this.dock === "bottom") y = window.innerHeight - h - DOCK_MARGIN;
-        this.place(el, {x, y});
-    }
-
-    /** live edge-snapping while the toolbar is dragged (edges detected by pointer) */
-    private applyDockDrag(x: number, y: number, px: number, py: number) {
-        const el = this.toolbar;
-        let dock: Dock = "free";
-        if (px < DOCK_SNAP) dock = "left";
-        else if (px > window.innerWidth - DOCK_SNAP) dock = "right";
-        else if (py < DOCK_SNAP) dock = "top";
-        else if (py > window.innerHeight - DOCK_SNAP) dock = "bottom";
-        this.dock = dock;
-        el.classList.toggle("zt-toolbar--vertical", dock === "left" || dock === "right");
-        const w2 = el.offsetWidth || 60;
-        const h2 = el.offsetHeight || 46;
-        let lx = x, ly = y;
-        if (dock === "left") lx = DOCK_MARGIN;
-        else if (dock === "right") lx = window.innerWidth - w2 - DOCK_MARGIN;
-        else if (dock === "top") ly = DOCK_MARGIN;
-        else if (dock === "bottom") ly = window.innerHeight - h2 - DOCK_MARGIN;
-        this.place(el, {x: lx, y: ly});
-    }
-
-    private placeDefaultIfFloating() {
-        if (!loadPos(POS_KEY)) this.defaultToolbarPos();
+    private currentPos(el: HTMLElement) {
+        return {x: parseFloat(el.style.left || "0"), y: parseFloat(el.style.top || "0")};
     }
 
     private bindDragging() {
@@ -193,7 +138,7 @@ export class Palette {
             const el = elRaw as HTMLElement;
             el.addEventListener("pointerdown", (e: PointerEvent) => {
                 const target = e.target as HTMLElement;
-                if (el === this.toolbar && target.closest("button,input,.zt-width")) return; // controls stay interactive
+                if (el === this.toolbar && target.closest("button")) return; // controls stay interactive
                 e.preventDefault();
                 e.stopPropagation();
                 const rect = el.getBoundingClientRect();
@@ -206,28 +151,16 @@ export class Palette {
                     // sub-threshold drift (Apple Pencil taps jitter ~1-2px) is
                     // a tap, not a drag — otherwise the ball never activates
                     if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+                    if (!moved) this.closePopover();
                     moved = true;
-                    if (el === this.toolbar) {
-                        this.applyDockDrag(ev.clientX - offX, ev.clientY - offY, ev.clientX, ev.clientY);
-                    } else {
-                        this.place(el, {x: ev.clientX - offX, y: ev.clientY - offY});
-                    }
+                    this.place(el, {x: ev.clientX - offX, y: ev.clientY - offY});
                 };
-                const up = (ev: PointerEvent) => {
+                const up = () => {
                     window.removeEventListener("pointermove", move);
                     window.removeEventListener("pointerup", up);
                     if (moved) {
-                        if (el === this.toolbar) {
-                            savePos(key, {
-                                x: parseFloat(el.style.left || "0"),
-                                y: parseFloat(el.style.top || "0"),
-                            });
-                            saveDock(this.dock);
-                            requestAnimationFrame(() => this.snapToDock());
-                        } else {
-                            savePos(key, {x: ev.clientX - offX, y: ev.clientY - offY});
-                            this.suppressClick = true; // drag, not a tap
-                        }
+                        savePos(key, this.currentPos(el));
+                        if (el === this.handle) this.suppressClick = true; // drag, not a tap
                     } else if (el === this.handle) {
                         // a plain tap on the handle toggles drawing mode
                         this.deps.onHandleActivate();
@@ -242,7 +175,7 @@ export class Palette {
 
     // -------------------------------------------------------------- render
 
-    private btn(icon: string, title: string, onClick: () => void, cls = ""): HTMLButtonElement {
+    private btn(icon: string, title: string, onClick: (b: HTMLButtonElement) => void, cls = ""): HTMLButtonElement {
         const b = document.createElement("button");
         b.className = `zt-btn ${cls}`.trim();
         b.innerHTML = icon;
@@ -250,78 +183,20 @@ export class Palette {
         b.setAttribute("aria-label", title);
         b.addEventListener("click", (e) => {
             e.stopPropagation();
-            onClick();
+            onClick(b);
         });
         return b;
     }
 
-    /** rheostat-style width slider; live value flows out through deps.onWidth */
-    private widthSlider(
-        kind: keyof typeof WIDTH_RANGE,
-        value: number,
-        dotColor: string,
-    ): HTMLDivElement {
-        let range: {min: number; max: number; step: number} = WIDTH_RANGE[kind];
-        if (kind === "pen") {
-            // cap is user-adjustable in settings
-            const max = Math.max(range.min, Math.round(this.deps.settings.penWidthMax || 20));
-            range = {min: range.min, max, step: range.step};
-        }
-        const wrap = document.createElement("div");
-        wrap.className = "zt-width";
-
-        const dot = document.createElement("i");
-        dot.className = "zt-width__dot";
-        dot.style.background = dotColor;
-        const setDot = (v: number) => {
-            const d = Math.round(6 + ((v - range.min) / (range.max - range.min)) * 14);
-            dot.style.width = `${d}px`;
-            dot.style.height = `${d}px`;
-        };
-
-        const sliderBox = document.createElement("div");
-        sliderBox.className = "zt-width__slider";
-        const input = document.createElement("input");
-        input.type = "range";
-        input.min = String(range.min);
-        input.max = String(range.max);
-        input.step = String(range.step);
-        input.value = String(snapToRange(value, range));
-        sliderBox.appendChild(input);
-
-        const val = document.createElement("span");
-        val.className = "zt-width__val";
-        val.textContent = input.value;
-        const syncTitle = () => {
-            wrap.title = `${input.value}px`;
-        };
-        syncTitle();
-        setDot(Number(input.value));
-
-        input.addEventListener("input", () => {
-            const v = Number(input.value);
-            setDot(v);
-            val.textContent = input.value;
-            syncTitle();
-            this.deps.onWidth(v);
-        });
-        // dragging the thumb must not drag the toolbar itself
-        input.addEventListener("pointerdown", (e) => e.stopPropagation());
-
-        wrap.append(dot, sliderBox, val);
-        return wrap;
-    }
-
     private renderToolbar() {
         const t = this.deps.i18n;
-        const cfg = this.deps.config;
-        const tool = cfg.tool;
-
+        const tool = this.deps.config.tool;
         this.toolbar.innerHTML = "";
 
-        // tool buttons
-        const toolsGroup = document.createElement("div");
-        toolsGroup.className = "zt-toolbar__group";
+        const grip = document.createElement("div");
+        grip.className = "zt-toolbar__grip";
+        this.toolbar.appendChild(grip);
+
         // Zotero's order: select, highlight, draw, shapes, note, eraser
         const toolDefs: Array<[ToolId, string, string]> = [
             ["select", ICONS.select, t("toolSelect")],
@@ -332,24 +207,137 @@ export class Palette {
             ["eraser", ICONS.eraser, t("toolEraser")],
         ];
         for (const [id, icon, label] of toolDefs) {
-            const b = this.btn(icon, label, () => this.deps.onSelectTool(id),
-                tool === id ? "zt-btn--active" : "");
-            toolsGroup.appendChild(b);
+            this.toolbar.appendChild(this.btn(icon, label, () => this.deps.onSelectTool(id),
+                tool === id ? "zt-btn--active" : ""));
         }
-        this.toolbar.appendChild(toolsGroup);
 
-        this.toolbar.appendChild(this.sep());
+        // the secondary slot: selection actions, or the options dot
+        if (tool === "select" && this.state.hasSelection) {
+            this.toolbar.appendChild(this.btn(ICONS.duplicate, t("strokeDuplicate"), () => this.deps.onAction("dupSel")));
+            this.toolbar.appendChild(this.btn(ICONS.trash, t("strokeDelete"), () => this.deps.onAction("deleteSel")));
+        } else if (tool !== "select") {
+            const dot = this.btn("", t("toolOptions"), (b) => this.togglePopover("options", b), "zt-btn--dot");
+            const swatch = document.createElement("i");
+            swatch.className = "zt-dot";
+            const color = this.activeColor();
+            if (color) swatch.style.background = color;
+            else swatch.classList.add("zt-dot--hollow");
+            dot.appendChild(swatch);
+            this.toolbar.appendChild(dot);
+        }
 
-        // contextual options
-        const options = document.createElement("div");
-        options.className = "zt-toolbar__options";
-        if (tool === "pen" || tool === "highlighter") {
-            const colors = tool === "pen" ? PEN_COLORS : HL_COLORS;
-            const activeColor = tool === "pen" ? cfg.penColor : cfg.hlColor;
-            for (const c of colors) options.appendChild(this.swatch(c, activeColor));
-            const activeWidth = tool === "pen" ? cfg.penWidth : cfg.hlWidth;
-            options.appendChild(this.widthSlider(tool, activeWidth, activeColor));
-        } else if (tool === "shape") {
+        const spacer = document.createElement("div");
+        spacer.className = "zt-toolbar__spacer";
+        this.toolbar.appendChild(spacer);
+
+        const undo = this.btn(ICONS.undo, t("undo"), () => this.deps.onAction("undo"));
+        undo.disabled = !this.state.canUndo;
+        const redo = this.btn(ICONS.redo, t("redo"), () => this.deps.onAction("redo"));
+        redo.disabled = !this.state.canRedo;
+        this.toolbar.append(
+            undo,
+            redo,
+            this.btn(ICONS.closeCircle, t("collapse"), () => this.deps.onAction("collapse")),
+            this.btn(ICONS.menu, t("more"), (b) => this.togglePopover("menu", b)),
+        );
+
+        if (this.toolbar.style.left) this.place(this.toolbar, this.currentPos(this.toolbar));
+    }
+
+    private activeColor(): string | null {
+        const cfg = this.deps.config;
+        switch (cfg.tool) {
+            case "pen": return cfg.penColor;
+            case "highlighter": return cfg.hlColor;
+            case "shape": return cfg.shapeColor;
+            case "note": return cfg.noteColor;
+            default: return null;
+        }
+    }
+
+    // ------------------------------------------------------------- popover
+
+    private togglePopover(kind: PopoverKind, anchor: HTMLElement) {
+        if (this.popoverKind === kind) {
+            this.closePopover();
+            return;
+        }
+        this.openPopover(kind, anchor);
+    }
+
+    private openPopover(kind: PopoverKind, anchor: HTMLElement) {
+        this.closePopover();
+        const pop = document.createElement("div");
+        pop.className = "zt-pop";
+        pop.addEventListener("pointerdown", (e) => e.stopPropagation());
+        if (kind === "options") this.fillOptions(pop);
+        else this.fillMenu(pop);
+        document.body.appendChild(pop);
+        this.popover = pop;
+        this.popoverKind = kind;
+        anchor.classList.add("zt-btn--open");
+        this.positionPopover(anchor);
+        document.addEventListener("pointerdown", this.onOutside, true);
+        // window capture runs before the plugin's document-level Esc (exit mode)
+        window.addEventListener("keydown", this.onPopoverKey, true);
+    }
+
+    private closePopover() {
+        if (!this.popover) return;
+        this.popover.remove();
+        this.popover = null;
+        this.popoverKind = null;
+        this.toolbar.querySelectorAll(".zt-btn--open").forEach((b) => b.classList.remove("zt-btn--open"));
+        document.removeEventListener("pointerdown", this.onOutside, true);
+        window.removeEventListener("keydown", this.onPopoverKey, true);
+    }
+
+    private onOutside = (e: PointerEvent) => {
+        const target = e.target as HTMLElement | null;
+        // the anchor button's own click toggles it
+        if (target && (this.popover?.contains(target) || target.closest(".zt-btn--open"))) return;
+        // like Zotero: a tap on the page only dismisses the popover — it must
+        // not also start a stroke. Other SiYuan UI still gets its click.
+        if (target?.closest(".zt-capture")) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        this.closePopover();
+    };
+
+    private onPopoverKey = (e: KeyboardEvent) => {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation(); // Esc closes the popover, not annotation mode
+        this.closePopover();
+    };
+
+    /** beside the anchor button, on whichever side of the toolbar has room */
+    private positionPopover(anchor: HTMLElement) {
+        const pop = this.popover;
+        if (!pop) return;
+        const tb = this.toolbar.getBoundingClientRect();
+        const a = anchor.getBoundingClientRect();
+        const w = pop.offsetWidth, h = pop.offsetHeight;
+        let x = tb.right + POPOVER_GAP;
+        const left = x + w > window.innerWidth - 8;
+        if (left) x = tb.left - POPOVER_GAP - w;
+        const y = Math.min(Math.max(8, a.top + a.height / 2 - h / 2), window.innerHeight - h - 8);
+        pop.style.left = `${Math.max(8, x)}px`;
+        pop.style.top = `${y}px`;
+        // the little arrow keeps pointing at the anchor button
+        pop.style.setProperty("--zt-pop-arrow", `${a.top + a.height / 2 - y}px`);
+        pop.classList.toggle("zt-pop--left", left);
+    }
+
+    private fillOptions(pop: HTMLDivElement) {
+        const cfg = this.deps.config;
+        const t = this.deps.i18n;
+        const tool = cfg.tool;
+
+        if (tool === "shape") {
+            const row = document.createElement("div");
+            row.className = "zt-pop__row";
             const kinds: Array<[ShapeKind, string, string]> = [
                 ["rect", ICONS.rect, t("shapeRect")],
                 ["ellipse", ICONS.ellipse, t("shapeEllipse")],
@@ -357,90 +345,104 @@ export class Palette {
                 ["arrow", ICONS.arrow, t("shapeArrow")],
             ];
             for (const [id, icon, label] of kinds) {
-                options.appendChild(this.btn(icon, label, () => this.deps.onShapeKind(id),
-                    `zt-btn--small ${cfg.shape === id ? "zt-btn--active" : ""}`));
+                row.appendChild(this.btn(icon, label, () => this.deps.onShapeKind(id),
+                    cfg.shape === id ? "zt-btn--active" : ""));
             }
-            for (const c of PEN_COLORS) options.appendChild(this.swatch(c, cfg.shapeColor));
-            options.appendChild(this.widthSlider("shape", cfg.shapeWidth, cfg.shapeColor));
-        } else if (tool === "note") {
-            for (const c of NOTE_COLORS) options.appendChild(this.swatch(c, cfg.noteColor));
-            const hint = document.createElement("span");
-            hint.className = "zt-toolbar__hint";
-            hint.textContent = t("noteToolHint");
-            options.appendChild(hint);
+            pop.appendChild(row);
+        }
+
+        const colors = tool === "pen" || tool === "shape" ? PEN_COLORS
+            : tool === "highlighter" || tool === "note" ? HL_COLORS : null;
+        const active = this.activeColor();
+        if (colors && active) {
+            const grid = document.createElement("div");
+            grid.className = "zt-pop__colors";
+            for (const c of colors) {
+                const sw = document.createElement("button");
+                sw.className = `zt-swatch${c.toLowerCase() === active.toLowerCase() ? " zt-swatch--active" : ""}`;
+                sw.style.setProperty("--zt-swatch", c);
+                sw.title = c;
+                sw.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.closePopover();
+                    this.deps.onColor(c);
+                });
+                grid.appendChild(sw);
+            }
+            pop.appendChild(grid);
+        }
+
+        if (tool === "pen" || tool === "highlighter" || tool === "shape") {
+            const width = tool === "pen" ? cfg.penWidth : tool === "highlighter" ? cfg.hlWidth : cfg.shapeWidth;
+            pop.appendChild(this.widthSlider(tool, width, active ?? "#888"));
         } else if (tool === "eraser") {
-            options.appendChild(this.widthSlider(
-                "eraser", this.deps.settings.eraserRadius, "rgba(255,255,255,.9)"));
-        } else if (tool === "select") {
-            const hint = document.createElement("span");
-            hint.style.cssText = "font-size:12px;color:rgba(255,255,255,.65);white-space:nowrap;";
-            hint.textContent = this.state.hasSelection
-                ? t("strokeDelete")
-                : t("toolSelect");
-            options.appendChild(hint);
+            pop.appendChild(this.widthSlider("eraser", this.deps.settings.eraserRadius, "#9aa0a6"));
         }
-        this.toolbar.appendChild(options);
-
-        // selection actions
-        if (this.state.hasSelection) {
-            this.toolbar.appendChild(this.sep());
-            const selGroup = document.createElement("div");
-            selGroup.className = "zt-toolbar__selection";
-            selGroup.appendChild(this.btn(ICONS.duplicate, this.deps.i18n("strokeDuplicate"), () => this.deps.onAction("dupSel")));
-            selGroup.appendChild(this.btn(ICONS.trash, this.deps.i18n("strokeDelete"), () => this.deps.onAction("deleteSel")));
-            selGroup.appendChild(this.btn(ICONS.check, this.deps.i18n("strokeDeselect"), () => this.deps.onAction("doneSel")));
-            this.toolbar.appendChild(selGroup);
-        }
-
-        this.toolbar.appendChild(this.sep());
-
-        // global actions
-        const actionsGroup = document.createElement("div");
-        actionsGroup.className = "zt-toolbar__group";
-        const undoBtn = this.btn(ICONS.undo, this.deps.i18n("undo"), () => this.deps.onAction("undo"));
-        (undoBtn as HTMLButtonElement & { disabled: boolean }).disabled = !this.state.canUndo;
-        const redoBtn = this.btn(ICONS.redo, this.deps.i18n("redo"), () => this.deps.onAction("redo"));
-        (redoBtn as HTMLButtonElement & { disabled: boolean }).disabled = !this.state.canRedo;
-        actionsGroup.append(
-            undoBtn,
-            redoBtn,
-            this.btn(ICONS.export, this.deps.i18n("exportImage"), () => this.deps.onAction("export")),
-            this.btn(ICONS.trash, this.deps.i18n("clearAll"), () => this.deps.onAction("clear")),
-        );
-        this.toolbar.appendChild(actionsGroup);
-
-        this.toolbar.appendChild(this.sep());
-        this.toolbar.appendChild(
-            this.btn(ICONS.gear, this.deps.i18n("settings"), () => this.deps.onAction("settings")),
-        );
-        this.toolbar.appendChild(
-            this.btn(ICONS.collapse, this.deps.i18n("collapse"), () => this.deps.onAction("collapse")),
-        );
-
-        // keep inside viewport after re-render (size may have changed)
-        this.applyDockClass();
-        const x = parseFloat(this.toolbar.style.left || "0");
-        const y = parseFloat(this.toolbar.style.top || "0");
-        this.place(this.toolbar, {x, y});
-        this.snapToDock();
     }
 
-    private swatch(color: string, active: string): HTMLButtonElement {
-        const sw = document.createElement("button");
-        sw.className = `zt-swatch ${color.toLowerCase() === active.toLowerCase() ? "zt-swatch--active" : ""}`;
-        sw.style.background = color;
-        sw.title = color;
-        sw.addEventListener("click", (e) => {
-            e.stopPropagation();
-            this.deps.onColor(color);
+    private fillMenu(pop: HTMLDivElement) {
+        const t = this.deps.i18n;
+        pop.classList.add("zt-pop--menu");
+        const items: Array<[string, string, PaletteAction]> = [
+            [ICONS.export, t("exportImage"), "export"],
+            [ICONS.trash, t("clearAll"), "clear"],
+            [ICONS.gear, t("settings"), "settings"],
+        ];
+        for (const [icon, label, action] of items) {
+            const item = document.createElement("button");
+            item.className = "zt-pop__item";
+            item.innerHTML = icon;
+            const span = document.createElement("span");
+            span.textContent = label;
+            item.appendChild(span);
+            item.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.closePopover();
+                this.deps.onAction(action);
+            });
+            pop.appendChild(item);
+        }
+    }
+
+    /** width slider with a live dot preview; value flows out through deps.onWidth */
+    private widthSlider(kind: keyof typeof WIDTH_RANGE, value: number, dotColor: string): HTMLDivElement {
+        let range: {min: number; max: number; step: number} = WIDTH_RANGE[kind];
+        if (kind === "pen") {
+            // cap is user-adjustable in settings
+            const max = Math.max(range.min, Math.round(this.deps.settings.penWidthMax || 20));
+            range = {min: range.min, max, step: range.step};
+        }
+        const wrap = document.createElement("div");
+        wrap.className = "zt-width";
+
+        const dotBox = document.createElement("span");
+        dotBox.className = "zt-width__preview";
+        const dot = document.createElement("i");
+        dot.style.background = dotColor;
+        dotBox.appendChild(dot);
+        const setDot = (v: number) => {
+            const d = Math.round(4 + ((v - range.min) / (range.max - range.min)) * 18);
+            dot.style.width = `${d}px`;
+            dot.style.height = `${d}px`;
+        };
+
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = String(range.min);
+        input.max = String(range.max);
+        input.step = String(range.step);
+        input.value = String(snapToRange(value, range));
+        wrap.title = `${input.value}px`;
+        setDot(Number(input.value));
+
+        input.addEventListener("input", () => {
+            const v = Number(input.value);
+            setDot(v);
+            wrap.title = `${v}px`;
+            this.deps.onWidth(v);
         });
-        return sw;
-    }
-
-    private sep(): HTMLDivElement {
-        const s = document.createElement("div");
-        s.className = "zt-toolbar__sep";
-        return s;
+        wrap.append(input, dotBox);
+        return wrap;
     }
 
     // --------------------------------------------------------------- state
@@ -450,10 +452,9 @@ export class Palette {
         this.toolbar.style.display = on ? "" : "none";
         this.handle.style.display = on ? "none" : "";
         this.handle.classList.toggle("zt-handle--on", on);
-        if (on) {
-            if (this.dock === "free") this.placeDefaultIfFloating();
-            else this.snapToDock();
-        }
+        if (!on) this.closePopover();
+        else if (!loadPos(POS_KEY)) this.defaultToolbarPos();
+        else this.place(this.toolbar, this.currentPos(this.toolbar));
     }
 
     update(state: Partial<PaletteState>) {
@@ -463,19 +464,24 @@ export class Palette {
             prev.canUndo !== this.state.canUndo ||
             prev.canRedo !== this.state.canRedo ||
             prev.hasSelection !== this.state.hasSelection;
-        if (structural) this.renderToolbar();
+        if (structural) this.refresh();
         this.handle.classList.toggle("zt-handle--on", this.state.mode);
     }
 
-    /** force a full re-render (tool/color/width changes) */
+    /** re-render after tool/color/shape changes; an open options popover stays open */
     refresh() {
+        const kind = this.popoverKind;
+        this.closePopover();
         this.renderToolbar();
+        if (kind === "options") {
+            const anchor = this.toolbar.querySelector<HTMLElement>(".zt-btn--dot");
+            if (anchor) this.openPopover(kind, anchor);
+        }
     }
 
     repositionForViewport() {
-        this.snapToDock();
-        const hx = parseFloat(this.handle.style.left || "0");
-        const hy = parseFloat(this.handle.style.top || "0");
-        this.place(this.handle, {x: hx, y: hy});
+        this.closePopover();
+        this.place(this.toolbar, this.currentPos(this.toolbar));
+        this.place(this.handle, this.currentPos(this.handle));
     }
 }

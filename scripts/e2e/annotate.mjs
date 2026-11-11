@@ -54,17 +54,50 @@ try {
     await page.click(".zt-handle");
     await page.waitForTimeout(300);
     check("点笔形按钮进入批注模式", await withPlugin(page, (pl) => pl.modeOn));
-    const titles = await page.locator(".zt-toolbar__group").first().locator("button").evaluateAll((bs) => bs.map((b) => b.title));
-    check("工具栏按 Zotero 顺序排列", JSON.stringify(titles) === JSON.stringify(["选择", "荧光笔", "钢笔", "形状", "便笺", "橡皮擦"]), titles);
+    const toast = await page.evaluate(() => document.querySelector("#message")?.textContent || "");
+    check("切换模式不弹提示", !toast.includes("批注模式"), toast);
+    const titles = await page.locator(".zt-toolbar button").evaluateAll((bs) => bs.map((b) => b.title));
+    check("竖排工具栏：Zotero 顺序 + 颜色点 + 撤销/重做/关闭/菜单",
+        JSON.stringify(titles) === JSON.stringify(["选择", "荧光笔", "钢笔", "形状", "便笺", "橡皮擦", "颜色与粗细", "撤销", "重做", "收起工具栏", "更多"]), titles);
+    check("工具栏只有图标没有文字", (await page.locator(".zt-toolbar").innerText()).trim() === "");
 
+    // color dot → secondary popover
+    await tool("钢笔");
+    await tool("颜色与粗细");
+    check("颜色点打开二级面板：8 色 + 粗细", await page.locator(".zt-pop .zt-swatch").count() === 8 &&
+        await page.locator(".zt-pop input[type=range]").count() === 1);
+    await page.locator(".zt-pop .zt-swatch[title='#2ea8e5']").click();
+    await page.waitForTimeout(150);
+    check("选色后面板关闭、颜色点更新", await page.locator(".zt-pop").count() === 0 &&
+        (await withPlugin(page, (pl) => pl.config.penColor)) === "#2ea8e5" &&
+        (await page.locator(".zt-dot").evaluate((d) => getComputedStyle(d).backgroundColor)) === "rgb(46, 168, 229)");
+    await tool("颜色与粗细");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(150);
+    check("Esc 只关二级面板，不退出批注模式", await page.locator(".zt-pop").count() === 0 && await withPlugin(page, (pl) => pl.modeOn));
+    await tool("更多");
+    const menu = await page.locator(".zt-pop .zt-pop__item").allInnerTexts();
+    check("菜单里是导出、清空、设置", menu.length === 3, menu);
+    await page.mouse.click(fb.x + fb.width / 2, fb.y - 30);
+    await page.waitForTimeout(150);
+    check("点别处关闭菜单", await page.locator(".zt-pop").count() === 0);
+    await page.screenshot({path: `${SHOT}-toolbar.png`});
+
+    const shapeKind = async (title) => {
+        await tool("颜色与粗细");
+        await page.click(`.zt-pop button[title="${title}"]`);
+        await page.waitForTimeout(100);
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(100);
+    };
     await tool("形状");
-    await tool("矩形");
+    await shapeKind("矩形");
     await drag({x: fb.x + 70, y: fb.y + 55}, {x: fb.x + 230, y: fb.y + 175});
-    await tool("椭圆");
+    await shapeKind("椭圆");
     await drag({x: fb.x + 320, y: fb.y + 60}, {x: fb.x + 470, y: fb.y + 160});
-    await tool("箭头");
+    await shapeKind("箭头");
     await drag({x: fb.x + 470, y: fb.y + 230}, {x: fb.x + 300, y: fb.y + 190});
-    await tool("直线");
+    await shapeKind("直线");
     await drag({x: fb.x + 60, y: fb.y + 250}, {x: fb.x + 260, y: fb.y + 262}, {shift: true});
     let s = await overlayState();
     check("画出 4 个形状", s.strokes.length === 4, s.strokes.length);
