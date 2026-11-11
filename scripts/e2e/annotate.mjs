@@ -146,6 +146,43 @@ try {
     await page.waitForTimeout(150);
     check("重做恢复形状", (await overlayState()).strokes.length === 4);
 
+    // ---------------------------------------------------------- pointer tool
+    // page works normally; only a press on a stroke selects/drags it
+    const paraBox = await page.locator(".protyle[data-e2e-active] .protyle-wysiwyg [data-type='NodeParagraph']", {hasText: "动画用本篇例子"}).first().boundingBox();
+    const ly = paraBox.y + paraBox.height / 2;
+    await drag({x: paraBox.x + 40, y: ly}, {x: paraBox.x + 260, y: ly}); // a line over body text
+    await tool("选择");
+    const hitPara = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("[data-node-id]") ? "block" : document.elementFromPoint(x, y)?.className, [paraBox.x + 300, paraBox.y + 10]);
+    check("指针工具下鼠标直接落在正文上", hitPara === "block", hitPara);
+    await page.mouse.dblclick(paraBox.x + 320, paraBox.y + 10);
+    await page.waitForTimeout(150);
+    const selText = await page.evaluate(() => getSelection().toString());
+    check("指针工具下可以双击选中文字", selText.length > 0, selText);
+    const fr = await (await iframe.elementHandle()).contentFrame();
+    const dotsNow = () => fr.locator(".dot").evaluateAll((ds) => ds.findIndex((d) => d.className.includes("on")));
+    const d0 = await dotsNow();
+    await fr.locator("button", {hasText: "下一步"}).click();
+    await page.waitForTimeout(400);
+    check("批注模式 + 指针工具下能点动画按钮", (await dotsNow()) !== d0);
+    await fr.locator("button", {hasText: "上一步"}).click();
+    await page.waitForTimeout(600);
+
+    const pb1 = await page.locator(".protyle[data-e2e-active] .protyle-wysiwyg [data-type='NodeParagraph']", {hasText: "动画用本篇例子"}).first().boundingBox();
+    const ly1 = pb1.y + pb1.height / 2;
+    await page.mouse.move(pb1.x + 150, ly1);
+    await page.waitForTimeout(100);
+    check("指针悬停在笔迹上显示移动光标", await page.evaluate(() => document.querySelector(".protyle[data-e2e-active]").style.cursor) === "move");
+    await drag({x: pb1.x + 150, y: ly1}, {x: pb1.x + 150, y: ly1 + 30});
+    s = await overlayState();
+    const moved5 = s.strokes[4];
+    check("指针点住笔迹能选中并拖动", s.strokes.length === 5 &&
+        await withPlugin(page, (pl) => pl.activeOverlay.selected.length) === 1, s.strokes.length);
+    check("拖完后页面仍可正常交互", await page.evaluate(() => !document.querySelector(".protyle[data-e2e-active] .zt-capture--active")));
+    await page.click('.zt-toolbar button[title="删除所选笔迹"]');
+    await page.waitForTimeout(150);
+    check("工具栏删除按钮删掉选中笔迹", (await overlayState()).strokes.length === 4, moved5?.n);
+    await tool("形状");
+
     // ---------------------------------------------------------- sticky note
     await tool("便笺");
     const para = page.locator(".protyle[data-e2e-active] .protyle-wysiwyg [data-type='NodeParagraph']", {hasText: "动画用本篇例子"}).first();

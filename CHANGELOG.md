@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 (2026-11-11)
+
+- 指针工具改为 Zotero 式：选中后鼠标照常操作页面（选文字、点链接、点动画按钮），只有点在笔迹或形状上才会选中并拖动。
+
 ## 0.1.0 (2026-11-11)
 
 首个版本，基于 [Pencil Annotation](https://github.com/BUGdefender404/pencil-annotation) 0.3.0 开发（原项目更新记录见其仓库）。

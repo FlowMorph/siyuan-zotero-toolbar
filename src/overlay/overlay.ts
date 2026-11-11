@@ -248,6 +248,8 @@ export class DocOverlay {
         });
         // on the root: drops on the capture layer, a note icon or an open
         // popup all bubble here
+        this.protyle.element.addEventListener("pointerdown", this.onPassDown, true);
+        this.protyle.element.addEventListener("pointermove", this.onPassHover, {capture: true, passive: true});
         this.root.addEventListener("dragover", this.onDragOver);
         this.root.addEventListener("drop", this.onDrop);
         document.addEventListener("visibilitychange", this.onVisible);
@@ -669,7 +671,7 @@ export class DocOverlay {
 
     setMode(on: boolean) {
         this.mode = on;
-        this.capture.classList.toggle("zt-capture--active", on);
+        this.syncCapture();
         if (on) {
             this.updateGeometry();
             this.scheduleRedraw();
@@ -679,7 +681,63 @@ export class DocOverlay {
         }
     }
 
+    /**
+     * The capture layer takes input in annotation mode — except with the
+     * select (pointer) tool, where the page works normally (text selection,
+     * links, iframes) and only a press on a stroke is intercepted
+     * (see onPassDown); the layer is switched on just for that drag.
+     */
+    private syncCapture() {
+        const on = this.mode && (this.deps.config.tool !== "select" || this.selDrag !== null);
+        this.capture.classList.toggle("zt-capture--active", on);
+        if (!on) this.protyle.element.style.cursor = "";
+    }
+
+    /** the active tool changed (toolbar) */
+    toolChanged() {
+        if (this.deps.config.tool !== "select") this.deselect();
+        this.syncCapture();
+    }
+
+    /** topmost stroke under a doc-space point */
+    private strokeAt(pt: Point): Stroke | undefined {
+        const offsets = this.buildOffsets();
+        for (let i = this.store.strokes.length - 1; i >= 0; i--) {
+            const s = this.store.strokes[i];
+            const o = offsets(s);
+            if (pointHitsStroke(s, pt.x - o.dx, pt.y - o.dy, SELECT_THRESHOLD)) return s;
+        }
+        return undefined;
+    }
+
+    private passThrough(e: PointerEvent): boolean {
+        return this.mode && this.deps.config.tool === "select" && this.selDrag === null &&
+            !(e.target as HTMLElement).closest?.(".zt-notes");
+    }
+
+    /** pointer tool: a press on a stroke selects/drags it, anything else reaches the page */
+    private onPassDown = (e: PointerEvent) => {
+        if (!this.passThrough(e) || e.button !== 0) return;
+        if (!this.strokeAt(this.toDoc(e))) {
+            this.deselect();
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        this.capture.classList.add("zt-capture--active");
+        this.onPointerDown(e);
+        this.syncCapture();
+    };
+
+    /** pointer tool: show a move cursor over strokes */
+    private onPassHover = (e: PointerEvent) => {
+        if (!this.passThrough(e) || e.buttons !== 0) return;
+        this.protyle.element.style.cursor = this.strokeAt(this.toDoc(e)) ? "move" : "";
+    };
+
     destroy() {
+        this.protyle.element.removeEventListener("pointerdown", this.onPassDown, true);
+        this.protyle.element.removeEventListener("pointermove", this.onPassHover, true);
         if (this.retroSnapTimer !== null) {
             window.clearTimeout(this.retroSnapTimer);
             this.retroSnapTimer = null;
@@ -860,11 +918,7 @@ export class DocOverlay {
             this.createNote(e.clientX, e.clientY, pt, "", true);
         } else if (tool === "select") {
             this.curAnchor = null;
-            const offsets = this.buildOffsets();
-            const hit = this.store.strokes.find((s) => {
-                const o = offsets(s);
-                return pointHitsStroke(s, pt.x - o.dx, pt.y - o.dy, SELECT_THRESHOLD);
-            });
+            const hit = this.strokeAt(pt);
             this.selected = hit ? [hit] : [];
             if (hit) {
                 this.selDrag = {lastX: pt.x, lastY: pt.y, totalDx: 0, totalDy: 0};
@@ -1044,6 +1098,7 @@ export class DocOverlay {
         this.drawing = false;
         this.erasing = false;
         this.selDrag = null;
+        this.syncCapture();
         this.curPoints = [];
         this.curAnchor = null;
         this.clearShapeSnap();
@@ -1173,6 +1228,7 @@ export class DocOverlay {
         this.erasing = false;
         this.curAnchor = null;
         this.clearShapeSnap();
+        this.syncCapture();
     }
 
     /** after a drag, re-anchor moved strokes to the block under their new position */

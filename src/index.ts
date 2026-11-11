@@ -101,6 +101,7 @@ export default class PencilAnnotationPlugin extends Plugin {
             settings: this.overlaySettings,
             onSelectTool: (tool) => {
                 this.config.tool = tool;
+                for (const overlay of this.overlays.values()) overlay.toolChanged();
                 this.persistSession();
                 this.palette.refresh();
             },
@@ -275,6 +276,7 @@ export default class PencilAnnotationPlugin extends Plugin {
 
     private togglePenEraser() {
         this.config.tool = this.config.tool === "eraser" ? "pen" : "eraser";
+        for (const overlay of this.overlays.values()) overlay.toolChanged();
         this.persistSession();
         this.palette.refresh();
         showMessage(this.t("doubleTapToggled", {tool: this.t(this.config.tool)}));

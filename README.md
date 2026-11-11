@@ -10,7 +10,7 @@ The toolbar mirrors Zotero: a vertical, icon-only strip. The color dot (or tappi
 
 | Tool | What it does |
 |---|---|
-| Select | Pick a stroke or shape, drag to move, duplicate or delete |
+| Pointer | The page works as usual (select text, follow links, click animation buttons); press on a stroke or shape to select, drag, duplicate or delete it |
 | Highlighter | Translucent, multiply-blended so text stays readable |
 | Pen | Stylus pressure; pause at the end of a stroke to straighten it into a shape (can be turned off) |
 | Shapes | Rectangle, ellipse, line, arrow by dragging; hold Shift for squares/circles and 45° lines |

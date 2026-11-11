@@ -2,7 +2,7 @@
   "name": "siyuan-zotero-toolbar",
   "author": "FlowMorph",
   "url": "https://github.com/FlowMorph/siyuan-zotero-toolbar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "3.1.0",
   "kernels": [
     "windows",
