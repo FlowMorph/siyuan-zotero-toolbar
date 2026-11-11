@@ -52,6 +52,10 @@ export interface SessionConfig {
     hlColor?: string;
     hlWidth?: number;
     eraserRadius?: number;
+    shape?: string;
+    shapeColor?: string;
+    shapeWidth?: number;
+    noteColor?: string;
 }
 
 const SESSION_KEY = "zotero-toolbar.session";

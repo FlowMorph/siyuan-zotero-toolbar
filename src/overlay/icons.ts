@@ -36,6 +36,14 @@ export const ICONS = {
         '<path d="M15.5 5.5v-.7A2.3 2.3 0 0 0 13.2 2.5H5.8A2.3 2.3 0 0 0 3.5 4.8v7.4a2.3 2.3 0 0 0 2.3 2.3h.7"/>',
     ),
     check: svg('<path d="m4.5 12.5 5 5 10-11"/>'),
+    /** sticky note: filled with currentColor (the note color), folded corner */
+    note: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v12l-6 6H3z" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="1.2" stroke-linejoin="round"/><path d="M15 21v-6h6" fill="rgba(255,255,255,.55)" stroke="rgba(0,0,0,.45)" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+    noteTool: svg('<path d="M4 4h16v10l-6 6H4z"/><path d="M14 20v-6h6"/>'),
+    shapes: svg('<rect x="3" y="3" width="10" height="10" rx="1"/><circle cx="16" cy="16" r="5"/>'),
+    rect: svg('<rect x="4" y="6" width="16" height="12" rx="1"/>'),
+    ellipse: svg('<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>'),
+    line: svg('<path d="M5 19 19 5"/>'),
+    arrow: svg('<path d="M5 19 19 5"/><path d="M10 5h9v9"/>'),
     export: svg(
         '<path d="M12 3v12"/><path d="m7 10.5 5 5 5-5"/>' +
         '<path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/>',

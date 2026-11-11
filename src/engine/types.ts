@@ -1,6 +1,9 @@
 /** Core data model shared by the drawing engine, storage and UI. */
 
-export type ToolId = "pen" | "highlighter" | "eraser" | "select";
+export type ToolId = "pen" | "highlighter" | "eraser" | "select" | "shape" | "note";
+
+/** shapes drawn by the shape tool; they are stored as ordinary pen strokes */
+export type ShapeKind = "rect" | "ellipse" | "line" | "arrow";
 
 /** A sample along a stroke: document-space coords plus pressure (0..1). */
 export interface Point {
@@ -68,12 +71,61 @@ export interface SerializedStroke {
     b?: [string, number, number];
 }
 
+/**
+ * Zotero-style sticky note. (x, y) is the icon's top-left corner, stored
+ * block-relative when `anchor` is set (same scheme as strokes) so the note
+ * follows its block through reflow.
+ */
+export interface Note {
+    id: string;
+    color: string;
+    /** plain text; ((id 'title')) refs, siyuan:// and http(s) links render as links */
+    text: string;
+    x: number;
+    y: number;
+    createdAt: number;
+    anchor?: StrokeAnchor;
+}
+
+/** Serialized note — few per document, so keys stay readable. */
+export interface SerializedNote {
+    id: string;
+    color: string;
+    text: string;
+    x: number;
+    y: number;
+    createdAt: number;
+    blockId?: string;
+}
+
 export interface PencilPayload {
     version: 1;
     docId: string;
     updatedAt: number;
     strokes: SerializedStroke[];
+    /** absent in payloads written before sticky notes existed */
+    notes?: SerializedNote[];
 }
+
+export const serializeNote = (n: Note): SerializedNote => ({
+    id: n.id,
+    color: n.color,
+    text: n.text,
+    x: Math.round(n.x * 100) / 100,
+    y: Math.round(n.y * 100) / 100,
+    createdAt: n.createdAt,
+    ...(n.anchor ? {blockId: n.anchor.blockId} : {}),
+});
+
+export const deserializeNote = (d: SerializedNote): Note => ({
+    id: d.id,
+    color: d.color,
+    text: d.text ?? "",
+    x: d.x,
+    y: d.y,
+    createdAt: d.createdAt,
+    ...(d.blockId ? {anchor: {blockId: d.blockId, ox: 0, oy: 0}} : {}),
+});
 
 export const serializeStroke = (s: Stroke): SerializedStroke => ({
     i: s.id,

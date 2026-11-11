@@ -1,16 +1,52 @@
 import {newId, strokeBBox, translateStroke} from "./geometry";
-import {deserializeStroke, serializeStroke, type PencilPayload, type Point, type Stroke, type StrokeTool} from "./types";
+import {
+    deserializeNote,
+    deserializeStroke,
+    serializeNote,
+    serializeStroke,
+    type Note,
+    type PencilPayload,
+    type Point,
+    type Stroke,
+    type StrokeTool,
+} from "./types";
+
+/** the mutable part of a note — what one undo step restores */
+export type NoteState = Pick<Note, "text" | "color" | "x" | "y" | "anchor">;
+
+export const noteState = (n: Note): NoteState => ({
+    text: n.text,
+    color: n.color,
+    x: n.x,
+    y: n.y,
+    ...(n.anchor ? {anchor: {...n.anchor}} : {}),
+});
+
+const sameNoteState = (a: NoteState, b: NoteState) =>
+    a.text === b.text && a.color === b.color && a.x === b.x && a.y === b.y &&
+    a.anchor?.blockId === b.anchor?.blockId;
+
+const applyNoteState = (n: Note, st: NoteState) => {
+    n.text = st.text;
+    n.color = st.color;
+    n.x = st.x;
+    n.y = st.y;
+    if (st.anchor) n.anchor = {...st.anchor};
+    else delete n.anchor;
+};
 
 export type Op =
-    | { type: "add"; strokes: Stroke[] }
-    | { type: "remove"; strokes: Stroke[] }
-    | { type: "move"; strokes: Stroke[]; dx: number; dy: number };
+    | { type: "add"; strokes: Stroke[]; notes?: Note[] }
+    | { type: "remove"; strokes: Stroke[]; notes?: Note[] }
+    | { type: "move"; strokes: Stroke[]; dx: number; dy: number }
+    | { type: "note"; note: Note; before: NoteState; after: NoteState };
 
 const UNDO_LIMIT = 100;
 
 /** In-memory document state: stroke list + undo/redo + persistence bookkeeping. */
 export class DocStore {
     strokes: Stroke[] = [];
+    notes: Note[] = [];
     docId: string;
 
     /** unsaved local changes exist (need to be pushed to the kernel) */
@@ -87,13 +123,43 @@ export class DocStore {
         this.commitMove(strokes, dx, dy);
     }
 
-    clearAll(): Stroke[] {
-        const removed = this.strokes;
-        if (removed.length === 0) return [];
+    /** removes every stroke and note as one undoable step; @returns true if anything was removed */
+    clearAll(): boolean {
+        const strokes = this.strokes;
+        const notes = this.notes;
+        if (strokes.length === 0 && notes.length === 0) return false;
         this.strokes = [];
-        this.pushOp({type: "remove", strokes: removed});
+        this.notes = [];
+        this.pushOp({type: "remove", strokes, notes});
         this.dirty = true;
-        return removed;
+        return true;
+    }
+
+    // ---------------------------------------------------------------- notes
+
+    addNote(note: Note) {
+        this.notes.push(note);
+        this.pushOp({type: "add", strokes: [], notes: [note]});
+        this.dirty = true;
+    }
+
+    removeNote(note: Note) {
+        if (!this.notes.includes(note)) return;
+        this.notes = this.notes.filter((n) => n !== note);
+        this.pushOp({type: "remove", strokes: [], notes: [note]});
+        this.dirty = true;
+    }
+
+    /**
+     * Records an edit/move/recolor already applied to `note` as one undo
+     * step; `before` is the state captured when the edit began.
+     */
+    commitNoteChange(note: Note, before: NoteState): boolean {
+        const after = noteState(note);
+        if (sameNoteState(before, after)) return false;
+        this.pushOp({type: "note", note, before, after});
+        this.dirty = true;
+        return true;
     }
 
     duplicateStroke(stroke: Stroke): Stroke | null {
@@ -112,15 +178,33 @@ export class DocStore {
         return copy;
     }
 
+    private dropItems(op: {strokes: Stroke[]; notes?: Note[]}) {
+        const ids = new Set(op.strokes.map((s) => s.id));
+        this.strokes = this.strokes.filter((s) => !ids.has(s.id));
+        if (op.notes?.length) {
+            const noteIds = new Set(op.notes.map((n) => n.id));
+            this.notes = this.notes.filter((n) => !noteIds.has(n.id));
+        }
+    }
+
+    private restoreItems(op: {strokes: Stroke[]; notes?: Note[]}) {
+        this.strokes.push(...op.strokes);
+        this.strokes.sort((a, b) => a.createdAt - b.createdAt);
+        if (op.notes?.length) {
+            this.notes.push(...op.notes);
+            this.notes.sort((a, b) => a.createdAt - b.createdAt);
+        }
+    }
+
     undo(): boolean {
         const op = this.undoStack.pop();
         if (!op) return false;
         if (op.type === "add") {
-            const ids = new Set(op.strokes.map((s) => s.id));
-            this.strokes = this.strokes.filter((s) => !ids.has(s.id));
+            this.dropItems(op);
         } else if (op.type === "remove") {
-            this.strokes.push(...op.strokes);
-            this.strokes.sort((a, b) => a.createdAt - b.createdAt);
+            this.restoreItems(op);
+        } else if (op.type === "note") {
+            applyNoteState(op.note, op.before);
         } else {
             for (const s of op.strokes) translateStroke(s, -op.dx, -op.dy);
         }
@@ -133,10 +217,11 @@ export class DocStore {
         const op = this.redoStack.pop();
         if (!op) return false;
         if (op.type === "add") {
-            this.strokes.push(...op.strokes);
+            this.restoreItems(op);
         } else if (op.type === "remove") {
-            const ids = new Set(op.strokes.map((s) => s.id));
-            this.strokes = this.strokes.filter((s) => !ids.has(s.id));
+            this.dropItems(op);
+        } else if (op.type === "note") {
+            applyNoteState(op.note, op.after);
         } else {
             for (const s of op.strokes) translateStroke(s, op.dx, op.dy);
         }
@@ -164,11 +249,13 @@ export class DocStore {
             docId: this.docId,
             updatedAt: Date.now(),
             strokes: this.strokes.map(serializeStroke),
+            notes: this.notes.map(serializeNote),
         };
     }
 
     adoptPayload(payload: PencilPayload) {
         this.strokes = (payload.strokes || []).map(deserializeStroke);
+        this.notes = (payload.notes || []).map(deserializeNote);
         this.lastSavedAt = payload.updatedAt || 0;
         this.undoStack = [];
         this.redoStack = [];
@@ -177,19 +264,16 @@ export class DocStore {
 
     /**
      * Union-merge a remote payload (sync from another device) into local
-     * strokes by id; local copies win for identical ids.
+     * strokes and notes by id; local copies win for identical ids.
      */
     mergeRemote(payload: PencilPayload): boolean {
-        const remote = (payload.strokes || []).map(deserializeStroke);
-        const localIds = new Set(this.strokes.map((s) => s.id));
-        const additions = remote.filter((s) => !localIds.has(s.id));
-        if (additions.length === 0) {
-            this.lastSavedAt = Math.max(this.lastSavedAt, payload.updatedAt || 0);
-            return false;
-        }
-        this.strokes.push(...additions);
-        this.strokes.sort((a, b) => a.createdAt - b.createdAt);
         this.lastSavedAt = Math.max(this.lastSavedAt, payload.updatedAt || 0);
+        const localIds = new Set(this.strokes.map((s) => s.id));
+        const strokes = (payload.strokes || []).map(deserializeStroke).filter((s) => !localIds.has(s.id));
+        const localNoteIds = new Set(this.notes.map((n) => n.id));
+        const notes = (payload.notes || []).map(deserializeNote).filter((n) => !localNoteIds.has(n.id));
+        if (strokes.length === 0 && notes.length === 0) return false;
+        this.restoreItems({strokes, notes});
         return true;
     }
 }

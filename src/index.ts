@@ -1,12 +1,15 @@
 import {
     confirm,
+    fetchSyncPost,
     getAllEditor,
     getFrontend,
+    openTab,
     Plugin,
     Setting,
     showMessage,
 } from "siyuan";
-import {DocOverlay, type OverlayConfig, type OverlaySettings, type ProtyleLike} from "./overlay/overlay";
+import {DocOverlay, type DroppedBlock, type OverlayConfig, type OverlaySettings, type ProtyleLike} from "./overlay/overlay";
+import {NOTE_COLORS} from "./overlay/notes";
 import {Palette, type PaletteAction} from "./overlay/toolbar";
 import {TOPBAR_SVG} from "./overlay/icons";
 import {loadPayload, savePayload} from "./plugin/api";
@@ -20,7 +23,12 @@ import {
     type PencilSettings,
 } from "./plugin/settings";
 import type {DocStore} from "./engine/store";
-import type {ToolId} from "./engine/types";
+import type {ShapeKind, ToolId} from "./engine/types";
+
+const TOOLS: ToolId[] = ["pen", "highlighter", "eraser", "select", "shape", "note"];
+const SHAPES: ShapeKind[] = ["rect", "ellipse", "line", "arrow"];
+/** label length for refs created by dropping a block (documents keep the full title) */
+const DROP_TITLE_MAX = 40;
 
 const SAVE_DEBOUNCE = 1200;
 
@@ -68,13 +76,16 @@ export default class PencilAnnotationPlugin extends Plugin {
         };
         const session = loadSession();
         this.config = {
-            tool: (["pen", "highlighter", "eraser", "select"] as ToolId[]).includes(session.tool as ToolId)
-                ? (session.tool as ToolId) : "pen",
+            tool: TOOLS.includes(session.tool as ToolId) ? (session.tool as ToolId) : "pen",
             penColor: session.penColor || this.settings.penColor,
             // clamp stale session widths that exceed the (possibly new) slider cap
             penWidth: Math.min(session.penWidth || this.settings.penWidth, this.settings.penWidthMax),
             hlColor: session.hlColor || this.settings.hlColor,
             hlWidth: session.hlWidth || this.settings.hlWidth,
+            shape: SHAPES.includes(session.shape as ShapeKind) ? (session.shape as ShapeKind) : "rect",
+            shapeColor: session.shapeColor || "#e03131",
+            shapeWidth: session.shapeWidth || 3,
+            noteColor: session.noteColor || NOTE_COLORS[0],
         };
 
         // core wiring first — the overlay must never depend on UI extras below
@@ -95,7 +106,14 @@ export default class PencilAnnotationPlugin extends Plugin {
             },
             onColor: (color) => {
                 if (this.config.tool === "highlighter") this.config.hlColor = color;
+                else if (this.config.tool === "shape") this.config.shapeColor = color;
+                else if (this.config.tool === "note") this.config.noteColor = color;
                 else this.config.penColor = color;
+                this.persistSession();
+                this.palette.refresh();
+            },
+            onShapeKind: (shape) => {
+                this.config.shape = shape;
                 this.persistSession();
                 this.palette.refresh();
             },
@@ -103,6 +121,7 @@ export default class PencilAnnotationPlugin extends Plugin {
                 // no palette.refresh() here: the slider updates itself in place,
                 // and a re-render mid-drag would tear the input from the pointer
                 if (this.config.tool === "highlighter") this.config.hlWidth = width;
+                else if (this.config.tool === "shape") this.config.shapeWidth = width;
                 else if (this.config.tool === "eraser") this.overlaySettings.eraserRadius = width;
                 else this.config.penWidth = width;
                 this.persistSession();
@@ -206,6 +225,11 @@ export default class PencilAnnotationPlugin extends Plugin {
             onStateChange: () => this.refreshPalette(),
             onDoubleTapToggle: () => this.togglePenEraser(),
             loadPayload: (docId) => loadPayload(this, docId),
+            i18n: this.t,
+            openRef: (id) => openTab({app: this.app, doc: {id, action: ["cb-get-focus", "cb-get-hl"]}}),
+            previewRef: (id, target) => this.addFloatLayer({refDefs: [{refID: id}], targetElement: target, isBacklink: false}),
+            openUrl: (href) => window.open(href, "_blank"),
+            resolveBlocks: (ids) => this.resolveBlocks(ids),
         });
         if (!overlay) return;
         this.overlays.set(p.id || overlay.docId, overlay);
@@ -313,6 +337,27 @@ export default class PencilAnnotationPlugin extends Plugin {
             hlColor: this.config.hlColor,
             hlWidth: this.config.hlWidth,
             eraserRadius: this.overlaySettings.eraserRadius,
+            shape: this.config.shape,
+            shapeColor: this.config.shapeColor,
+            shapeWidth: this.config.shapeWidth,
+            noteColor: this.config.noteColor,
+        });
+    }
+
+    /** titles for dropped doc/block ids: doc title, or the block's text trimmed */
+    private async resolveBlocks(ids: string[]): Promise<DroppedBlock[]> {
+        const valid = ids.filter((id) => /^\d{14}-[0-9a-z]{7}$/.test(id));
+        if (valid.length === 0) return [];
+        const stmt = `SELECT id, type, content FROM blocks WHERE id IN (${valid.map((id) => `'${id}'`).join(",")})`;
+        const res = await fetchSyncPost("/api/query/sql", {stmt});
+        const rows = (res.data ?? []) as Array<{id: string; type: string; content: string}>;
+        const byId = new Map(rows.map((r) => [r.id, r]));
+        return valid.flatMap((id) => {
+            const r = byId.get(id);
+            if (!r) return [];
+            const text = r.content.replace(/\s+/g, " ").trim();
+            const title = r.type === "d" || text.length <= DROP_TITLE_MAX ? text : `${text.slice(0, DROP_TITLE_MAX)}…`;
+            return [{id, title}];
         });
     }
 

@@ -1,14 +1,18 @@
 import {
+    newId,
     pointHitsStroke,
     segmentHitsStroke,
     smoothDense,
     unionBBox,
     type BBox,
 } from "../engine/geometry";
+import {blockRefText} from "../engine/noteText";
+import {buildShape, isDegenerateShape} from "../engine/primitives";
 import {paintOne, paintStrokes, StrokeRenderer, type OffsetFn, type Viewport} from "../engine/renderer";
 import {recognizeShape} from "../engine/shapes";
-import {DocStore} from "../engine/store";
-import type {PencilPayload, Point, Stroke, StrokeAnchor, ToolId} from "../engine/types";
+import {DocStore, type NoteState} from "../engine/store";
+import type {Note, PencilPayload, Point, ShapeKind, Stroke, StrokeAnchor, StrokeTool, ToolId} from "../engine/types";
+import {NOTE_ICON_SIZE, NoteLayer} from "./notes";
 
 /** Minimal structural view of a SiYuan protyle — keeps the overlay testable. */
 export interface ProtyleLike {
@@ -36,6 +40,16 @@ export interface OverlayConfig {
     penWidth: number;
     hlColor: string;
     hlWidth: number;
+    shape: ShapeKind;
+    shapeColor: string;
+    shapeWidth: number;
+    noteColor: string;
+}
+
+/** a block or document dropped onto the page, resolved to a ref title */
+export interface DroppedBlock {
+    id: string;
+    title: string;
 }
 
 export interface OverlayDeps {
@@ -48,7 +62,20 @@ export interface OverlayDeps {
     /** pencil double-tap wants a pen<->eraser switch */
     onDoubleTapToggle: () => void;
     loadPayload: (docId: string) => Promise<PencilPayload | null>;
+    i18n: (key: string) => string;
+    openRef: (blockId: string) => void;
+    previewRef: (blockId: string, target: HTMLElement) => void;
+    openUrl: (href: string) => void;
+    /** look up titles for dropped block/document ids (unknown ids are left out) */
+    resolveBlocks: (ids: string[]) => Promise<DroppedBlock[]>;
 }
+
+/** SiYuan drag payloads (see app/src/constants.ts in siyuan) */
+const DROP_FILE = "application/siyuan-file";
+const DROP_GUTTER = "application/siyuan-gutter";
+const ZWSP = "\u200b";
+/** stacked notes from a multi-item drop step down by this much */
+const DROP_STACK = 28;
 
 const SELECT_THRESHOLD = 14;
 const DPR_CAP = 3;
@@ -68,6 +95,7 @@ export class DocOverlay {
     private hlCanvas!: HTMLCanvasElement;
     private liveCanvas!: HTMLCanvasElement;
     private capture!: HTMLDivElement;
+    private noteLayer!: NoteLayer;
 
     private wysiwygEl: HTMLElement | null = null;
     private contentEl: HTMLElement | null = null;
@@ -87,6 +115,8 @@ export class DocOverlay {
     private curStart = {x: 0, y: 0, t: 0};
     private curMoved = 0;
     private eraseHitSomething = false;
+    /** shape tool drag in progress (doc coords; anchor captured at the start) */
+    private shapeDraft: {start: Point; end: Point; anchor: StrokeAnchor | null; constrain: boolean} | null = null;
 
     // selection drag
     private selDrag: { lastX: number; lastY: number; totalDx: number; totalDy: number } | null = null;
@@ -156,7 +186,17 @@ export class DocOverlay {
         this.liveCanvas.className = "zt-canvas";
         this.capture = document.createElement("div");
         this.capture.className = "zt-capture";
-        this.root.append(this.inkCanvas, this.hlCanvas, this.liveCanvas, this.capture);
+        this.noteLayer = new NoteLayer({
+            i18n: deps.i18n,
+            onChange: (note, before) => this.onNoteChange(note, before),
+            onDragEnd: (note, before) => this.onNoteDragEnd(note, before),
+            onDelete: (note) => this.deleteNote(note),
+            openRef: deps.openRef,
+            previewRef: deps.previewRef,
+            openUrl: deps.openUrl,
+        });
+        // notes sit above the capture layer: clickable in and out of drawing mode
+        this.root.append(this.inkCanvas, this.hlCanvas, this.liveCanvas, this.capture, this.noteLayer.el);
         el.appendChild(this.root);
 
         this.bindEvents();
@@ -208,6 +248,8 @@ export class DocOverlay {
         this.capture.addEventListener("contextmenu", (e) => {
             if (this.mode) e.preventDefault();
         });
+        this.capture.addEventListener("dragover", this.onDragOver);
+        this.capture.addEventListener("drop", this.onDrop);
         document.addEventListener("visibilitychange", this.onVisible);
     }
 
@@ -350,7 +392,7 @@ export class DocOverlay {
         const zero = {dx: 0, dy: 0};
         if (!w) return () => zero;
         const wr = w.getBoundingClientRect();
-        return (s: Stroke) => {
+        return (s: {anchor?: StrokeAnchor}) => {
             if (!s.anchor) return zero;
             let d = this.blockOffsetCache.get(s.anchor.blockId);
             if (!d) {
@@ -440,7 +482,19 @@ export class DocOverlay {
             paintStrokes(hlCtx, this.store.strokes, this.renderer, vp,
                 (s) => s.tool !== "highlighter", offsets);
         }
+        this.renderNotes(vp, clip, offsets);
         this.redrawLive(offsets);
+    }
+
+    private renderNotes(vp: Viewport, clip: BBox | null, offsets: OffsetFn) {
+        const half = NOTE_ICON_SIZE / 2;
+        this.noteLayer.render(this.store.notes, (n) => {
+            const o = offsets(n);
+            const x = n.x + o.dx, y = n.y + o.dy;
+            const visible = !clip || (x + half >= clip.minX && x + half <= clip.maxX &&
+                y + half >= clip.minY && y + half <= clip.maxY);
+            return {left: x - vp.originX, top: y - vp.originY, visible};
+        });
     }
 
     /** live layer: current stroke / eraser cursor / selection box */
@@ -452,7 +506,15 @@ export class DocOverlay {
         if (!ctx) return;
         this.prepareCtx(ctx, vp, clip);
 
-        if (this.drawing && this.curPoints.length > 0) {
+        if (this.shapeDraft) {
+            const d = this.shapeDraft;
+            const style = this.currentStyle();
+            paintOne(ctx, {
+                id: "live", tool: "pen", color: style.color, width: style.width, opacity: 1,
+                simulate: true, createdAt: 0,
+                points: buildShape(this.deps.config.shape, d.start, d.end, style.width, d.constrain),
+            }, this.renderer, vp);
+        } else if (this.drawing && this.curPoints.length > 0) {
             const tool = this.deps.config.tool as "pen" | "highlighter";
             const cfg = tool === "pen"
                 ? {color: this.deps.config.penColor, width: this.deps.config.penWidth, opacity: 1}
@@ -626,6 +688,7 @@ export class DocOverlay {
             this.scrollEl.removeEventListener("scroll", this.scheduleRedraw);
             this.scrollEl = null;
         }
+        this.noteLayer.destroy();
         this.root.remove();
     }
 
@@ -654,12 +717,12 @@ export class DocOverlay {
 
     clearAll() {
         const removed = this.store.clearAll();
-        if (removed.length > 0) {
+        if (removed) {
             this.deselect();
             this.scheduleRedraw();
             this.changed();
         }
-        return removed.length > 0;
+        return removed;
     }
 
     deleteSelection() {
@@ -777,6 +840,15 @@ export class DocOverlay {
             this.erasing = true;
             this.curPoints = [pt];
             this.eraseSegment(pt.x, pt.y, pt.x, pt.y);
+        } else if (tool === "shape") {
+            this.shapeDraft = {
+                start: {...pt, p: 0.5}, end: {...pt, p: 0.5},
+                anchor: this.captureAnchor(e.clientX, e.clientY), constrain: e.shiftKey,
+            };
+            this.redrawLive();
+        } else if (tool === "note") {
+            this.finishPointer();
+            this.createNote(e.clientX, e.clientY, pt, "", true);
         } else if (tool === "select") {
             this.curAnchor = null;
             const offsets = this.buildOffsets();
@@ -806,14 +878,18 @@ export class DocOverlay {
         if (e.pointerType === "touch" && !this.touchPointers.has(e.pointerId)) return;
         if (this.pan && this.movePan(e)) return;
         if (e.pointerId !== this.activePointerId) return;
-        if (!this.drawing && !this.erasing && !this.selDrag) return;
+        if (!this.drawing && !this.erasing && !this.selDrag && !this.shapeDraft) return;
 
         const pt = this.toDoc(e);
         e.preventDefault();
         const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
         const samples = events.length > 0 ? events : [e];
 
-        if (this.drawing) {
+        if (this.shapeDraft) {
+            this.shapeDraft.end = {...pt, p: 0.5};
+            this.shapeDraft.constrain = e.shiftKey;
+            this.requestLive();
+        } else if (this.drawing) {
             if (this.shapeSnap && this.shapeSnapAt) {
                 // pen moved again after the snap → revert to freehand drawing
                 if (Math.hypot(pt.x - this.shapeSnapAt.x, pt.y - this.shapeSnapAt.y) > 3) {
@@ -891,7 +967,19 @@ export class DocOverlay {
             return;
         }
 
-        if (this.drawing) {
+        if (this.shapeDraft) {
+            const d = this.shapeDraft;
+            d.end = {...pt, p: 0.5};
+            d.constrain = e.shiftKey;
+            this.shapeDraft = null;
+            if (!isDegenerateShape(d.start, d.end)) {
+                const points = buildShape(this.deps.config.shape, d.start, d.end,
+                    this.currentStyle().width, d.constrain);
+                this.commitStroke(points, d.anchor, true, true);
+            } else {
+                this.redrawLive();
+            }
+        } else if (this.drawing) {
             // the lift position is a real sample too — fast strokes otherwise
             // end wherever the last move event happened to land
             this.pushSample(e);
@@ -943,6 +1031,7 @@ export class DocOverlay {
     private finishPointer() {
         this.activePointerId = null;
         this.activePointerType = "";
+        this.shapeDraft = null;
         this.drawing = false;
         this.erasing = false;
         this.selDrag = null;
@@ -1064,9 +1153,10 @@ export class DocOverlay {
     }
 
     private cancelActiveInput() {
-        if (this.drawing || this.erasing || this.selDrag || this.curPoints.length > 0) {
+        if (this.drawing || this.erasing || this.selDrag || this.shapeDraft || this.curPoints.length > 0) {
             this.curPoints = [];
             this.selDrag = null;
+            this.shapeDraft = null;
             this.redrawLive();
         }
         this.activePointerId = null;
@@ -1266,16 +1356,21 @@ export class DocOverlay {
         };
     }
 
-    private commitStroke(points: Point[], anchor?: StrokeAnchor | null, simulate?: boolean): Stroke | null {
+    /** stroke style of the active drawing tool; shapes are pen-layer strokes */
+    private currentStyle(): {tool: StrokeTool; color: string; width: number; opacity: number} {
+        const cfg = this.deps.config;
+        if (cfg.tool === "highlighter") return {tool: "highlighter", color: cfg.hlColor, width: cfg.hlWidth, opacity: 0.45};
+        if (cfg.tool === "shape") return {tool: "pen", color: cfg.shapeColor, width: cfg.shapeWidth, opacity: 1};
+        return {tool: "pen", color: cfg.penColor, width: cfg.penWidth, opacity: 1};
+    }
+
+    /** @param exact constructed geometry (shape tool) — skip ink smoothing */
+    private commitStroke(points: Point[], anchor?: StrokeAnchor | null, simulate?: boolean, exact = false): Stroke | null {
         if (points.length === 0) return null;
         // smooth dense freehand ink once, symmetrically (no directional lag);
         // sparse constructed shapes (snapped rects / lines) pass through exact
-        points = smoothDense(points);
-        const cfg = this.deps.config;
-        const tool = cfg.tool as "pen" | "highlighter";
-        const stroke = tool === "pen"
-            ? {color: cfg.penColor, width: cfg.penWidth, opacity: 1}
-            : {color: cfg.hlColor, width: cfg.hlWidth, opacity: 0.45};
+        if (!exact) points = smoothDense(points);
+        const {tool, ...stroke} = this.currentStyle();
         // the delayed pending-timer commit must not re-read the live pointer
         // type (it is cleared after pointerup) — use the captured value
         const sim = simulate ?? (this.activePointerType !== "pen");
@@ -1296,6 +1391,97 @@ export class DocOverlay {
         this.changed();
         return committed;
     }
+
+    // ---------------------------------------------------------------- notes
+
+    /** place a note centred on a doc-space point; `edit` opens its editor */
+    private createNote(clientX: number, clientY: number, pt: {x: number; y: number}, text: string, edit: boolean): Note {
+        const anchor = this.captureAnchor(clientX, clientY);
+        const half = NOTE_ICON_SIZE / 2;
+        const note: Note = {
+            id: newId(),
+            color: this.deps.config.noteColor,
+            text,
+            x: Math.round((pt.x - half - (anchor?.ox ?? 0)) * 100) / 100,
+            y: Math.round((pt.y - half - (anchor?.oy ?? 0)) * 100) / 100,
+            createdAt: Date.now(),
+            ...(anchor ? {anchor: {blockId: anchor.blockId, ox: 0, oy: 0}} : {}),
+        };
+        this.store.addNote(note);
+        this.redrawAll();
+        this.changed();
+        if (edit) this.noteLayer.open(note, true);
+        return note;
+    }
+
+    private onNoteChange(note: Note, before: NoteState) {
+        if (!this.store.commitNoteChange(note, before)) return;
+        this.scheduleRedraw();
+        this.changed();
+    }
+
+    /** after a drag, re-anchor the note to the block now under its centre */
+    private onNoteDragEnd(note: Note, before: NoteState) {
+        const w = this.wysiwygEl;
+        if (w) {
+            const prev = this.buildOffsets()(note);
+            const half = NOTE_ICON_SIZE / 2;
+            const absX = note.x + prev.dx, absY = note.y + prev.dy;
+            const wr = w.getBoundingClientRect();
+            const anchor = this.captureAnchor(wr.left + absX + half, wr.top + absY + half);
+            if (anchor) {
+                note.anchor = {blockId: anchor.blockId, ox: 0, oy: 0};
+                note.x = Math.round((absX - anchor.ox) * 100) / 100;
+                note.y = Math.round((absY - anchor.oy) * 100) / 100;
+            }
+            // no block under the new spot → keep the old anchor; the drag
+            // delta already lives in x/y
+        }
+        this.onNoteChange(note, before);
+    }
+
+    private deleteNote(note: Note) {
+        this.store.removeNote(note);
+        this.scheduleRedraw();
+        this.changed();
+    }
+
+    /** ids carried by a SiYuan drag: doc-tree items or gutter-dragged blocks */
+    private static droppedIds(dt: DataTransfer): string[] {
+        const gutter = Array.from(dt.types).find((t) => t.startsWith(DROP_GUTTER));
+        if (gutter) return gutter.slice(DROP_GUTTER.length).split(ZWSP)[2]?.split(",").filter(Boolean) ?? [];
+        if (dt.types.includes(DROP_FILE)) return dt.getData(DROP_FILE).split(",").filter(Boolean);
+        return [];
+    }
+
+    private static isSiyuanDrag(dt: DataTransfer | null): boolean {
+        return !!dt && Array.from(dt.types).some((t) => t === DROP_FILE || t.startsWith(DROP_GUTTER));
+    }
+
+    private onDragOver = (e: DragEvent) => {
+        if (!this.mode || !DocOverlay.isSiyuanDrag(e.dataTransfer)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer!.dropEffect = "copy";
+    };
+
+    /** dropping documents/blocks in drawing mode pins a linked note per item */
+    private onDrop = async (e: DragEvent) => {
+        if (!this.mode || !DocOverlay.isSiyuanDrag(e.dataTransfer)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const ids = DocOverlay.droppedIds(e.dataTransfer!);
+        const {clientX, clientY} = e;
+        const pt = this.toDoc(e as unknown as PointerEvent);
+        const blocks = await this.deps.resolveBlocks(ids);
+        let last: Note | null = null;
+        for (const [i, b] of blocks.entries()) {
+            const d = i * DROP_STACK;
+            last = this.createNote(clientX + d, clientY + d, {x: pt.x + d, y: pt.y + d},
+                blockRefText(b.id, b.title), false);
+        }
+        if (last) this.noteLayer.open(last);
+    };
 
     private eraseSegment(x1: number, y1: number, x2: number, y2: number, offsets?: OffsetFn) {
         const r = this.deps.settings.eraserRadius;

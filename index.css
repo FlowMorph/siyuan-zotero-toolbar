@@ -339,3 +339,160 @@ svg.zt-topbar-svg {
 }
 .zt-export__note { margin-top: 8px; font-size: 12px; }
 .zt-export__pdf { width: 100%; justify-content: center; margin-top: 2px; }
+
+/* ---------- shape kinds / note tool options ---------- */
+
+.zt-btn--small {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+}
+
+.zt-btn--small svg {
+    width: 18px;
+    height: 18px;
+}
+
+.zt-toolbar__hint {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.65);
+    white-space: nowrap;
+    padding-left: 4px;
+}
+
+/* ---------- sticky notes ---------- */
+
+.zt-notes {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.zt-note {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 22px;
+    height: 22px;
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    transition: filter 0.12s;
+}
+
+.zt-note svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.zt-note:hover,
+.zt-note--open {
+    filter: drop-shadow(0 0 1.5px rgba(99, 102, 241, 1)) drop-shadow(0 0 1.5px rgba(99, 102, 241, 1));
+}
+
+.zt-note:active {
+    cursor: grabbing;
+}
+
+.zt-note-popup {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 260px;
+    pointer-events: auto;
+    background: var(--b3-theme-background, #fff);
+    color: var(--b3-theme-on-background, #222);
+    border: 1px solid var(--b3-border-color, rgba(0, 0, 0, 0.15));
+    border-top: 4px solid var(--zt-note-color, #ffd400);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+    font-size: 13px;
+    line-height: 1.6;
+    z-index: 1;
+}
+
+.zt-note-popup__head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--b3-border-color, rgba(0, 0, 0, 0.08));
+}
+
+.zt-note-popup__swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    padding: 0;
+    cursor: pointer;
+    flex: none;
+}
+
+.zt-note-popup__swatch--active {
+    outline: 2px solid var(--b3-theme-on-background, #222);
+    outline-offset: 1px;
+}
+
+.zt-note-popup__btn {
+    margin-left: auto;
+    width: 24px;
+    height: 24px;
+    padding: 2px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--b3-theme-on-surface, #666);
+    cursor: pointer;
+}
+
+.zt-note-popup__btn:hover {
+    background: var(--b3-list-hover, rgba(0, 0, 0, 0.06));
+    color: var(--b3-theme-error, #d23f31);
+}
+
+.zt-note-popup__btn svg {
+    width: 100%;
+    height: 100%;
+}
+
+.zt-note-popup__body {
+    padding: 8px 10px;
+    min-height: 40px;
+    max-height: 320px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    cursor: text;
+}
+
+.zt-note-popup__placeholder {
+    color: var(--b3-theme-on-surface-light, #999);
+}
+
+.zt-note-popup__input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+}
+
+.zt-note-link {
+    color: var(--b3-protyle-inline-link-color, #4285f4);
+    cursor: pointer;
+    text-decoration: none;
+    border-bottom: 1px dashed currentColor;
+}
+
+.zt-note-link--ref {
+    color: var(--b3-protyle-inline-blockref-color, #3575f0);
+}

@@ -1,6 +1,6 @@
 import {getStroke} from "perfect-freehand";
 import {bboxesIntersect, strokeBBox, type BBox} from "./geometry";
-import type {Stroke} from "./types";
+import type {Stroke, StrokeAnchor} from "./types";
 
 /**
  * Turns a stroke into the outline polygon that perfect-freehand generates
@@ -104,8 +104,8 @@ export interface Viewport {
     height: number;
 }
 
-/** per-stroke render offset (block-anchor delta in doc coords) */
-export type OffsetFn = (stroke: Stroke) => {dx: number; dy: number};
+/** per-item render offset (block-anchor delta in doc coords) — strokes and notes */
+export type OffsetFn = (item: {anchor?: StrokeAnchor}) => {dx: number; dy: number};
 
 /**
  * Paints strokes onto a 2d context. The caller has already applied the

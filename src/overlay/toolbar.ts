@@ -1,6 +1,7 @@
-import type {ToolId} from "../engine/types";
+import type {ShapeKind, ToolId} from "../engine/types";
 import type {OverlayConfig, OverlaySettings} from "./overlay";
 import {ICONS} from "./icons";
+import {NOTE_COLORS} from "./notes";
 
 export const PEN_COLORS = ["#1e1e1e", "#e03131", "#2f6fed", "#2f9e44", "#f76707", "#9c36b5"];
 export const HL_COLORS = ["#ffd400", "#ff922b", "#69db7c", "#4dabf7", "#f783ac"];
@@ -9,6 +10,7 @@ export const HL_COLORS = ["#ffd400", "#ff922b", "#69db7c", "#4dabf7", "#f783ac"]
 export const WIDTH_RANGE = {
     pen: {min: 1, max: 20, step: 1}, // max overridden by settings.penWidthMax
     highlighter: {min: 10, max: 60, step: 5},
+    shape: {min: 1, max: 12, step: 1},
     eraser: {min: 10, max: 50, step: 5},
 } as const;
 
@@ -32,6 +34,7 @@ export interface PaletteDeps {
     settings: OverlaySettings;
     onSelectTool: (tool: ToolId) => void;
     onColor: (color: string) => void;
+    onShapeKind: (shape: ShapeKind) => void;
     onWidth: (width: number) => void;
     onAction: (action: PaletteAction) => void;
     /** tapping the floating handle toggles drawing mode */
@@ -319,11 +322,14 @@ export class Palette {
         // tool buttons
         const toolsGroup = document.createElement("div");
         toolsGroup.className = "zt-toolbar__group";
+        // Zotero's order: select, highlight, draw, shapes, note, eraser
         const toolDefs: Array<[ToolId, string, string]> = [
-            ["pen", ICONS.penStroke, t("toolPen")],
-            ["highlighter", ICONS.highlighter, t("toolHighlighter")],
-            ["eraser", ICONS.eraser, t("toolEraser")],
             ["select", ICONS.select, t("toolSelect")],
+            ["highlighter", ICONS.highlighter, t("toolHighlighter")],
+            ["pen", ICONS.penStroke, t("toolPen")],
+            ["shape", ICONS.shapes, t("toolShape")],
+            ["note", ICONS.noteTool, t("toolNote")],
+            ["eraser", ICONS.eraser, t("toolEraser")],
         ];
         for (const [id, icon, label] of toolDefs) {
             const b = this.btn(icon, label, () => this.deps.onSelectTool(id),
@@ -340,19 +346,28 @@ export class Palette {
         if (tool === "pen" || tool === "highlighter") {
             const colors = tool === "pen" ? PEN_COLORS : HL_COLORS;
             const activeColor = tool === "pen" ? cfg.penColor : cfg.hlColor;
-            for (const c of colors) {
-                const sw = document.createElement("button");
-                sw.className = `zt-swatch ${c.toLowerCase() === activeColor.toLowerCase() ? "zt-swatch--active" : ""}`;
-                sw.style.background = c;
-                sw.title = c;
-                sw.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    this.deps.onColor(c);
-                });
-                options.appendChild(sw);
-            }
+            for (const c of colors) options.appendChild(this.swatch(c, activeColor));
             const activeWidth = tool === "pen" ? cfg.penWidth : cfg.hlWidth;
             options.appendChild(this.widthSlider(tool, activeWidth, activeColor));
+        } else if (tool === "shape") {
+            const kinds: Array<[ShapeKind, string, string]> = [
+                ["rect", ICONS.rect, t("shapeRect")],
+                ["ellipse", ICONS.ellipse, t("shapeEllipse")],
+                ["line", ICONS.line, t("shapeLine")],
+                ["arrow", ICONS.arrow, t("shapeArrow")],
+            ];
+            for (const [id, icon, label] of kinds) {
+                options.appendChild(this.btn(icon, label, () => this.deps.onShapeKind(id),
+                    `zt-btn--small ${cfg.shape === id ? "zt-btn--active" : ""}`));
+            }
+            for (const c of PEN_COLORS) options.appendChild(this.swatch(c, cfg.shapeColor));
+            options.appendChild(this.widthSlider("shape", cfg.shapeWidth, cfg.shapeColor));
+        } else if (tool === "note") {
+            for (const c of NOTE_COLORS) options.appendChild(this.swatch(c, cfg.noteColor));
+            const hint = document.createElement("span");
+            hint.className = "zt-toolbar__hint";
+            hint.textContent = t("noteToolHint");
+            options.appendChild(hint);
         } else if (tool === "eraser") {
             options.appendChild(this.widthSlider(
                 "eraser", this.deps.settings.eraserRadius, "rgba(255,255,255,.9)"));
@@ -408,6 +423,18 @@ export class Palette {
         const y = parseFloat(this.toolbar.style.top || "0");
         this.place(this.toolbar, {x, y});
         this.snapToDock();
+    }
+
+    private swatch(color: string, active: string): HTMLButtonElement {
+        const sw = document.createElement("button");
+        sw.className = `zt-swatch ${color.toLowerCase() === active.toLowerCase() ? "zt-swatch--active" : ""}`;
+        sw.style.background = color;
+        sw.title = color;
+        sw.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.deps.onColor(color);
+        });
+        return sw;
     }
 
     private sep(): HTMLDivElement {
