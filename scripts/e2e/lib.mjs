@@ -36,6 +36,16 @@ export async function api(path, body = {}) {
     return json.data;
 }
 
+/** 读工作空间文件原文（getFile 直接返回文件内容，不带 {code} 包装） */
+export async function getFile(path) {
+    const res = await fetch(BASE + "/api/file/getFile", {
+        method: "POST",
+        headers: {"Content-Type": "application/json", Authorization: `Token ${token()}`},
+        body: JSON.stringify({path}),
+    });
+    return res.text();
+}
+
 /** 构建并复制到 data/plugins/<NAME>，再通过内核启用 */
 export async function deploy({build = true} = {}) {
     if (build) execSync("npm run build", {cwd: ROOT, stdio: "inherit"});
@@ -62,16 +72,25 @@ export async function launch() {
 /** 打开思源网页端并跳到指定文档，等插件挂上覆盖层 */
 export async function openDoc(page, docId) {
     await page.goto(`${BASE}/stage/build/desktop/?id=${docId}`);
-    await page.waitForFunction((name) => {
+    // restored tabs attach overlays too — wait for the visible one of this doc
+    // and make it the active overlay
+    await page.waitForFunction(([name, id]) => {
         const pl = window.siyuan?.ws?.app?.plugins?.find((p) => p.name === name);
-        return pl && pl.activeOverlay && pl.activeOverlay.docId;
-    }, NAME, {timeout: 30000});
-    await page.waitForFunction((id) =>
-        document.querySelector(`.protyle:not(.fn__none) .protyle-wysiwyg [data-node-id]`) &&
-        window.siyuan.ws.app.plugins.find((p) => p.name === "siyuan-zotero-toolbar").activeOverlay.docId === id,
-    docId, {timeout: 30000});
+        const ov = pl && [...pl.overlays.values()].find((o) =>
+            o.docId === id && !o.protyle.element.closest(".fn__none") &&
+            o.protyle.element.querySelector(".protyle-wysiwyg [data-node-id]"));
+        if (ov) {
+            pl.activeOverlay = ov;
+            document.querySelectorAll("[data-e2e-active]").forEach((el) => el.removeAttribute("data-e2e-active"));
+            ov.protyle.element.dataset.e2eActive = "1";
+        }
+        return !!ov;
+    }, [NAME, docId], {timeout: 30000});
     await page.waitForTimeout(800);
 }
+
+/** 当前测试文档所在编辑器（openDoc 打的标记） */
+export const ACTIVE = ".protyle[data-e2e-active]";
 
 /** 在页面里对插件实例求值：fn(plugin, arg) */
 export const withPlugin = (page, fn, arg) =>

@@ -83,6 +83,10 @@ const config: OverlayConfig = {
     penWidth: 4,
     hlColor: "#ffd400",
     hlWidth: 20,
+    shape: "rect",
+    shapeColor: "#e03131",
+    shapeWidth: 3,
+    noteColor: "#ffd400",
 };
 
 const counts = {dirty: 0, stateChanges: 0, doubleTaps: 0, saved: 0 as unknown};
@@ -117,6 +121,10 @@ const overlay = DocOverlay.attach(fakeProtyle, {
         log(`double-tap → tool=${config.tool}`);
     },
     loadPayload: async () => preset,
+    i18n: t,
+    openRef: (id) => log(`openRef ${id}`),
+    openUrl: (href) => log(`openUrl ${href}`),
+    resolveBlocks: async (ids) => ids.map((id) => ({id, title: id})),
 })!;
 
 // palette (same wiring as the plugin entry)
@@ -130,6 +138,11 @@ const palette = new Palette({
         log(`tool=${tool}`);
     },
     onColor: (c) => log(`color=${c}`),
+    onShapeKind: (k) => {
+        config.shape = k;
+        palette.refresh();
+        log(`shape=${k}`);
+    },
     onWidth: (w) => log(`width=${w}`),
     onAction: (a) => log(`action=${a}`),
 });

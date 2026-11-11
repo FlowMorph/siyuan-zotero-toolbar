@@ -1,6 +1,6 @@
 /**
  * Generates icon.png (160x160) with zero dependencies:
- * a rounded-square indigo gradient tile with a white pencil drawn diagonally.
+ * a rounded-square Zotero-red tile with a white sticky note and a pencil.
  * Run: node scripts/gen-icon.mjs
  */
 import {deflateSync} from "node:zlib";
@@ -41,8 +41,10 @@ const eraser = (x, y) => sdRoundRect(x, y, -62, 0, 7.5, halfH, 6) < 0;
 const ferrule = (x, y) => sdRoundRect(x, y, -50.5, 0, 2.6, halfH + 0.6, 2) < 0;
 
 const COLORS = {
-    bg1: [0x5b, 0x5f, 0xf1],   // indigo
-    bg2: [0x8b, 0x5c, 0xf6],   // violet
+    bg1: [0xcc, 0x29, 0x36],   // Zotero red
+    bg2: [0xe8, 0x5d, 0x3f],   // warm orange-red
+    fold: [0xf3, 0xd9, 0x8a],
+    line: [0xc9, 0xcd, 0xd6],
     white: [0xff, 0xff, 0xff],
     wood: [0xf6, 0xc1, 0x6b],
     graphite: [0x37, 0x3a, 0x45],
@@ -51,14 +53,26 @@ const COLORS = {
 };
 
 const cx = W / 2, cy = W / 2;
+
+// sticky note in icon pixels: square with a folded bottom-right corner
+const NOTE = {x0: 30, y0: 28, x1: 112, y1: 110, fold: 28};
+const inNote = (px, py) => px >= NOTE.x0 && px <= NOTE.x1 && py >= NOTE.y0 && py <= NOTE.y1 &&
+    px + py <= NOTE.x1 + NOTE.y1 - NOTE.fold;
+const inFold = (px, py) => px <= NOTE.x1 && py <= NOTE.y1 &&
+    px >= NOTE.x1 - NOTE.fold && py >= NOTE.y1 - NOTE.fold &&
+    px + py >= NOTE.x1 + NOTE.y1 - NOTE.fold;
+const inLine = (px, py) => px >= NOTE.x0 + 12 && [50, 64, 78].some((ly, i) =>
+    Math.abs(py - ly) <= 2.6 && px <= (i === 2 ? NOTE.x1 - 40 : NOTE.x1 - 12));
+const PENCIL_C = {x: 112 * SS, y: 108 * SS};
 const COS = Math.cos(-Math.PI / 4), SIN = Math.sin(-Math.PI / 4);
 
 for (let y = 0; y < W; y++) {
     for (let x = 0; x < W; x++) {
         // local (rotated -45deg, pencil points up-right)
-        const dx = x - cx, dy = y - cy;
-        const lx = (dx * COS - dy * SIN) / 1.22;
-        const ly = (dx * SIN + dy * COS) / 1.22;
+        const dx = x - PENCIL_C.x, dy = y - PENCIL_C.y;
+        const lx = (dx * COS - dy * SIN) / 2.05;
+        const ly = (dx * SIN + dy * COS) / 2.05;
+        const px = x / SS, py = y / SS;
 
         let r = 0, g = 0, b = 0, a = 0;
 
@@ -80,13 +94,15 @@ for (let y = 0; y < W; y++) {
             a = 255 * alpha;
         }
 
-        // pencil parts over the tile
+        // note, then the pencil over it
         let col = null;
+        if (inFold(px, py)) col = COLORS.fold;
+        else if (inNote(px, py)) col = inLine(px, py) ? COLORS.line : COLORS.white;
         if (lead(lx, ly)) col = COLORS.graphite;
         else if (tip(lx, ly)) col = COLORS.wood;
         else if (ferrule(lx, ly)) col = COLORS.ferruleCol;
         else if (eraser(lx, ly)) col = COLORS.eraserCol;
-        else if (body(lx, ly)) col = COLORS.white;
+        else if (body(lx, ly)) col = COLORS.graphite;
         if (col) {
             r = col[0]; g = col[1]; b = col[2]; a = 255;
         }

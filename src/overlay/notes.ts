@@ -25,7 +25,6 @@ export interface NoteLayerDeps {
     onDragEnd: (note: Note, before: NoteState) => void;
     onDelete: (note: Note) => void;
     openRef: (blockId: string) => void;
-    previewRef: (blockId: string, target: HTMLElement) => void;
     openUrl: (href: string) => void;
 }
 
@@ -241,12 +240,15 @@ export class NoteLayer {
             a.className = `zt-note-link zt-note-link--${seg.type}`;
             a.textContent = seg.label;
             if (seg.type === "ref") {
+                // SiYuan's global popover logic previews any [data-type=block-ref]
+                // on hover, honouring the user's float-window setting
+                a.dataset.type = "block-ref";
+                a.dataset.subtype = "s";
                 a.dataset.id = seg.id;
                 a.addEventListener("click", (e) => {
                     e.preventDefault();
                     this.deps.openRef(seg.id);
                 });
-                a.addEventListener("mouseenter", () => this.deps.previewRef(seg.id, a));
             } else {
                 a.href = seg.href;
                 a.title = seg.href;

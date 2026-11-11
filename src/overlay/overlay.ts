@@ -64,7 +64,6 @@ export interface OverlayDeps {
     loadPayload: (docId: string) => Promise<PencilPayload | null>;
     i18n: (key: string) => string;
     openRef: (blockId: string) => void;
-    previewRef: (blockId: string, target: HTMLElement) => void;
     openUrl: (href: string) => void;
     /** look up titles for dropped block/document ids (unknown ids are left out) */
     resolveBlocks: (ids: string[]) => Promise<DroppedBlock[]>;
@@ -192,7 +191,6 @@ export class DocOverlay {
             onDragEnd: (note, before) => this.onNoteDragEnd(note, before),
             onDelete: (note) => this.deleteNote(note),
             openRef: deps.openRef,
-            previewRef: deps.previewRef,
             openUrl: deps.openUrl,
         });
         // notes sit above the capture layer: clickable in and out of drawing mode
@@ -248,8 +246,10 @@ export class DocOverlay {
         this.capture.addEventListener("contextmenu", (e) => {
             if (this.mode) e.preventDefault();
         });
-        this.capture.addEventListener("dragover", this.onDragOver);
-        this.capture.addEventListener("drop", this.onDrop);
+        // on the root: drops on the capture layer, a note icon or an open
+        // popup all bubble here
+        this.root.addEventListener("dragover", this.onDragOver);
+        this.root.addEventListener("drop", this.onDrop);
         document.addEventListener("visibilitychange", this.onVisible);
     }
 
@@ -265,7 +265,12 @@ export class DocOverlay {
         this.resizeObs.observe(this.root);
         if (this.contentEl) this.resizeObs.observe(this.contentEl);
         // wysiwyg observation (size + DOM mutations) is kept in sync with the
-        // live element by syncContentWatchers(), called from resolveRefs()
+        // live element by syncContentWatchers(), called from resolveRefs().
+        // Its first call ran before resizeObs existed, so the wysiwyg was never
+        // size-observed: an embedded animation resizing its iframe shifted the
+        // content below without a repaint. Re-sync now that the observer exists.
+        this.observedWysiwyg = null;
+        this.syncContentWatchers();
     }
 
     // ------------------------------------------------------------- geometry
@@ -490,9 +495,13 @@ export class DocOverlay {
         const half = NOTE_ICON_SIZE / 2;
         this.noteLayer.render(this.store.notes, (n) => {
             const o = offsets(n);
-            const x = n.x + o.dx, y = n.y + o.dy;
-            const visible = !clip || (x + half >= clip.minX && x + half <= clip.maxX &&
-                y + half >= clip.minY && y + half <= clip.maxY);
+            let x = n.x + o.dx;
+            const y = n.y + o.dy;
+            // a note pinned in the right margin must not vanish when the
+            // window narrows: keep it inside the content horizontally (display
+            // only — the stored position is untouched)
+            if (clip) x = Math.min(Math.max(x, clip.minX), clip.maxX - NOTE_ICON_SIZE);
+            const visible = !clip || (y + half >= clip.minY && y + half <= clip.maxY);
             return {left: x - vp.originX, top: y - vp.originY, visible};
         });
     }

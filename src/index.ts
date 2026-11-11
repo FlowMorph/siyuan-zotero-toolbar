@@ -227,7 +227,6 @@ export default class PencilAnnotationPlugin extends Plugin {
             loadPayload: (docId) => loadPayload(this, docId),
             i18n: this.t,
             openRef: (id) => openTab({app: this.app, doc: {id, action: ["cb-get-focus", "cb-get-hl"]}}),
-            previewRef: (id, target) => this.addFloatLayer({refDefs: [{refID: id}], targetElement: target, isBacklink: false}),
             openUrl: (href) => window.open(href, "_blank"),
             resolveBlocks: (ids) => this.resolveBlocks(ids),
         });

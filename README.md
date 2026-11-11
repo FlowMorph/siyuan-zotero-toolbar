@@ -1,80 +1,67 @@
-# Pencil Annotation
+# Zotero Toolbar for SiYuan
 
-Handwrite on SiYuan documents with **Apple Pencil / a stylus**: a GoodNotes-style transparent annotation layer over the whole document, with a pressure-sensitive pen, highlighter, eraser and stroke selection. **Strokes are stored per document in the plugin's private data directory and travel with SiYuan's encrypted sync** — write on the iPad, it appears on your desktop, and survives reinstalls.
+Bring Zotero's annotation toolbar to SiYuan: annotate any document with a pen, highlighter, shapes, sticky notes and an eraser on a **separate layer** that never touches your content, including embedded HTML animations and iframes.
 
-> Inspired by [Cherise233/siyuan-document_drawing-plugins](https://github.com/Cherise233/siyuan-document_drawing-plugins) (not published on the marketplace; ships no source code or license). This is a from-scratch TypeScript implementation — no code reused — with two deliberate improvements: sync-safe storage (instead of localStorage) and real stylus pressure.
+![Preview](preview.png)
 
 ## Features
 
-- **Pressure pen** — real stylus pressure via Pointer Events (Apple Pencil); mouse/touchpad falls back to velocity-based simulated pressure.
-- **Highlighter** — translucent, `multiply`-blended so text stays readable through the mark; overlaps between strokes deepen naturally (no dark spots inside a single stroke).
-- **Eraser** — stroke-level erase while dragging, adjustable size, with a cursor ring.
-- **Select** — tap a stroke to select, then drag to move, duplicate or delete it.
-- **Undo / redo** — toolbar buttons (plus `Ctrl+Z` / `Ctrl+Shift+Z` on desktop), up to 100 steps.
-- **Palm rejection** — in drawing mode fingers scroll the page and only a stylus can draw (toggleable in settings).
-- **Apple Pencil double-tap** — quickly double-tap the page with the pencil to switch pen ↔ eraser (toggleable).
-- **Floating toolbar** — draggable handle + palette with position memory; desktop also gets a top-bar button.
-- **Export** — composite strokes to PNG (white or transparent background), save to assets, optionally insert into the document.
-- **English & Simplified Chinese UI**.
+The toolbar follows Zotero's order:
 
-## Storage & multi-device sync
+| Tool | What it does |
+|---|---|
+| Select | Pick a stroke or shape, drag to move, duplicate or delete |
+| Highlighter | Translucent, multiply-blended so text stays readable |
+| Pen | Stylus pressure; pause at the end of a stroke to straighten it into a shape (can be turned off) |
+| Shapes | Rectangle, ellipse, line, arrow by dragging; hold Shift for squares/circles and 45° lines |
+| Sticky note | Click anywhere to pin a note, drag it around, click to read or edit; 8 Zotero colors |
+| Eraser | Stroke eraser with adjustable size |
 
-Each document's strokes live in one JSON file:
+**Links in sticky notes**
+
+- Block refs `((block-id 'title'))`: paste straight from SiYuan's "Copy block ref". Hovering shows SiYuan's own preview (following your float-window setting), and clicking opens the block.
+- `siyuan://blocks/…` links, `[label](url)` and bare URLs all become clickable links.
+- In annotation mode, dragging a document from the doc tree, or a block (by its gutter icon) from another tab, onto the page pins a note that links to it.
+
+**Layer behaviour**
+
+- Enter annotation mode from the floating pen button, the top-bar button or the command palette; Esc exits.
+- Outside annotation mode, strokes and shapes stay visible while input passes through to the document, so animations and buttons keep working. Sticky notes can be opened and dragged in both modes.
+- Strokes, shapes and notes are anchored to their block and follow it through reflow, window resizes and animated iframes changing height.
+- Undo/redo covers everything (create, move, recolor, edit, delete, clear): `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`.
+
+## Storage
+
+One JSON file per document:
 
 ```
-{workspace}/data/storage/petal/pencil-annotation/{docID}.json
+{workspace}/data/storage/petal/siyuan-zotero-toolbar/{docID}.json
 ```
 
-This is the plugin-private petal directory, which is part of SiYuan's encrypted sync:
+This is the plugin's private data directory and it syncs with SiYuan. Concurrent edits on two devices merge strokes and notes by id, and the local copy wins when ids match.
 
-- strokes are saved (debounced, 1.2 s) right after each gesture;
-- when another device syncs new strokes in, open editors **merge by stroke id** and show a notice;
-- concurrent edits on two devices merge as a union by stroke id (local wins for identical ids).
+## Install
 
-## Install (dev build)
-
-1. `npm install && npm run build` → output in `build/`;
-2. copy everything from `build/` into `{SiYuan workspace}/data/plugins/pencil-annotation/`, or run:
-   ```bash
-   node scripts/copy-assets.mjs "/path/to/workspace/data/plugins"
-   ```
-3. restart SiYuan (or reload from Settings → Marketplace) and enable **Pencil Annotation** under downloaded plugins.
-
-### On the iPad
-
-**Marketplace (recommended)**. The plugin has been submitted to the official SiYuan bazaar ([PR](https://github.com/siyuan-note/bazaar/pulls?q=is%3Apr+BUGdefender404%2Fpencil-annotation)). Once merged, open SiYuan on the iPad → Settings → Marketplace → Plugins, search for **Pencil Annotation** and install; future updates ship through the marketplace too.
-
-**Browser (quick test)**. Open the desktop instance's LAN address (e.g. `http://192.168.x.x:6806`) in iPad Safari — the plugin works in the mobile browser frontend as well.
-
-> The iOS workspace lives inside the app sandbox, so files cannot be copied into `data/plugins` directly like on desktop; apart from the marketplace, mobile-browser access is the lightest way to try it.
-
-## Release process (maintainer)
-
-1. bump `version` in `plugin.json` and update `CHANGELOG.md`;
-2. `npm run pack` → `package.zip`;
-3. create a GitHub Release with a tag matching the version and attach the zip: `gh release create v0.1.0 package.zip`;
-4. first listing: add a line `BUGdefender404/pencil-annotation` to `plugins.txt` in [siyuan-note/bazaar](https://github.com/siyuan-note/bazaar) and open a PR; later versions only need a new Release — the bazaar picks it up automatically.
+- **Marketplace**: Settings → Marketplace → Plugins, search "Zotero Toolbar".
+- **Manual**: download `package.zip` from [Releases](https://github.com/FlowMorph/siyuan-zotero-toolbar/releases), unzip into `{workspace}/data/plugins/siyuan-zotero-toolbar/`, and enable it under Downloaded.
 
 ## Development
 
 ```bash
 npm install
 npm run typecheck
-npm run build
-npm run deploy -- "/path/to/workspace/data/plugins"
-npm run harness     # browser test bench at http://localhost:5199/test/harness.html
-npm run pack
+npm test            # unit tests: shape geometry, note text parsing, note undo/merge
+npm run build       # → build/
+npm run e2e         # deploy to the local workspace and drive SiYuan's web UI with Chrome
+npm run pack        # build + package.zip for the marketplace
 ```
 
-The harness (`test/harness.html`) mocks the SiYuan editor DOM and drives the real input path with synthetic PointerEvents (including pressure), so drawing, highlighter blending, erasing, selection, gestures and export can be verified without launching SiYuan.
+E2E defaults to the `~/SiYuan` workspace, a kernel at `http://127.0.0.1:6806` and Chrome on macOS. Override them with `SIYUAN_WORKSPACE`, `SIYUAN_BASE` and `CHROME_PATH`. For the code map, see [docs/index.md](docs/index.md).
 
-## Known limitations (v1 roadmap)
+## Credits
 
-- Strokes are anchored to **document coordinates**: reflowing text (window resize, font-size change) does not move existing strokes — same trade-off as annotating a PDF.
-- No layers, no lasso multi-select, no pixel eraser (planned).
-- Undo history is per-session and resets when the document closes (strokes themselves persist).
-- Very long documents use a viewport canvas with culling; thousands of strokes may need tile caching for smoother scrolling.
+Built on [Pencil Annotation](https://github.com/BUGdefender404/pencil-annotation) (MIT). The pen, highlighter, eraser, selection, gestures and sync-safe storage come from that project. This plugin adds shapes, sticky notes, drag-in links and a Zotero-style toolbar.
 
 ## License
 
-MIT
+MIT, with the original project's copyright notice retained.
