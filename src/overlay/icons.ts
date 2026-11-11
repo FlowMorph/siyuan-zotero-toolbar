@@ -54,5 +54,5 @@ export const ICONS = {
 
 export const TOPBAR_SVG = ICONS.penStroke.replace(
     "<svg ",
-    '<svg class="pa-topbar-svg" style="width:16px;height:16px" ',
+    '<svg class="zt-topbar-svg" style="width:16px;height:16px" ',
 );

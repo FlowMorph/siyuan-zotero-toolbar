@@ -34,7 +34,7 @@ for (const name of copies) {
 
 let target = process.env.SIYUAN_PLUGIN_DIR || process.argv[2];
 if (target) {
-    target = resolve(target, "pencil-annotation");
+    target = resolve(target, "siyuan-zotero-toolbar");
     mkdirSync(target, {recursive: true});
     for (const entry of readdirSync(buildDir)) {
         cpSync(join(buildDir, entry), join(target, entry), {recursive: true});

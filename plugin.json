@@ -1,8 +1,8 @@
 {
-  "name": "pencil-annotation",
-  "author": "Ray Zhang",
-  "url": "https://github.com/BUGdefender404/pencil-annotation",
-  "version": "0.3.0",
+  "name": "siyuan-zotero-toolbar",
+  "author": "FlowMorph",
+  "url": "https://github.com/FlowMorph/siyuan-zotero-toolbar",
+  "version": "0.1.0",
   "minAppVersion": "3.1.0",
   "kernels": [
     "windows",
@@ -30,12 +30,12 @@
     "browser-mobile"
   ],
   "displayName": {
-    "default": "Pencil Annotation",
-    "zh-CN": "Pencil 手写批注"
+    "default": "Zotero Toolbar",
+    "zh-CN": "Zotero 工具栏"
   },
   "description": {
-    "default": "Handwrite on your documents with Apple Pencil or a stylus: pressure-sensitive pen, highlighter, eraser, selection, and sync-safe storage.",
-    "zh-CN": "用 Apple Pencil/触控笔在文档上手写批注：压感钢笔、荧光笔、橡皮擦、笔迹选择移动，笔迹随思源同步，不惧换机与重装。"
+    "default": "A Zotero-style annotation layer over SiYuan documents: pen, highlighter, shapes, sticky notes with links, eraser. Annotations live on a separate layer and never touch your content.",
+    "zh-CN": "把 Zotero 的批注工具栏搬进思源：在文档上方的独立图层里用画笔、荧光笔、形状、便笺（支持链接）和橡皮做批注，不改动正文。"
   },
   "readme": {
     "default": "README.md",
@@ -44,14 +44,16 @@
   "icon": "icon.png",
   "preview": "preview.png",
   "keywords": [
-    "pencil",
-    "draw",
-    "drawing",
-    "handwriting",
+    "zotero",
     "annotation",
-    "手写",
+    "sticky note",
+    "shape",
+    "draw",
+    "handwriting",
     "批注",
-    "绘图",
-    "apple pencil"
+    "便笺",
+    "形状",
+    "涂鸦",
+    "手写"
   ]
 }

@@ -38,9 +38,9 @@ export interface PaletteDeps {
     onHandleActivate: () => void;
 }
 
-const POS_KEY = "pencil-annotation.toolbar-pos";
-const DOCK_KEY = "pencil-annotation.toolbar-dock";
-const HANDLE_POS_KEY = "pencil-annotation.handle-pos";
+const POS_KEY = "zotero-toolbar.toolbar-pos";
+const DOCK_KEY = "zotero-toolbar.toolbar-dock";
+const HANDLE_POS_KEY = "zotero-toolbar.handle-pos";
 
 type Dock = "free" | "top" | "bottom" | "left" | "right";
 const DOCK_SNAP = 34;   // px from an edge that triggers docking
@@ -86,12 +86,12 @@ export class Palette {
         this.deps = deps;
 
         this.toolbar = document.createElement("div");
-        this.toolbar.className = "pa-toolbar";
+        this.toolbar.className = "zt-toolbar";
         this.toolbar.style.display = "none";
         document.body.appendChild(this.toolbar);
 
         this.handle = document.createElement("button");
-        this.handle.className = "pa-handle";
+        this.handle.className = "zt-handle";
         this.handle.innerHTML = ICONS.penStroke;
         this.handle.style.display = "none";
         document.body.appendChild(this.handle);
@@ -120,7 +120,7 @@ export class Palette {
 
     private applyDockClass() {
         this.toolbar.classList.toggle(
-            "pa-toolbar--vertical",
+            "zt-toolbar--vertical",
             this.dock === "left" || this.dock === "right",
         );
     }
@@ -170,7 +170,7 @@ export class Palette {
         else if (py < DOCK_SNAP) dock = "top";
         else if (py > window.innerHeight - DOCK_SNAP) dock = "bottom";
         this.dock = dock;
-        el.classList.toggle("pa-toolbar--vertical", dock === "left" || dock === "right");
+        el.classList.toggle("zt-toolbar--vertical", dock === "left" || dock === "right");
         const w2 = el.offsetWidth || 60;
         const h2 = el.offsetHeight || 46;
         let lx = x, ly = y;
@@ -190,7 +190,7 @@ export class Palette {
             const el = elRaw as HTMLElement;
             el.addEventListener("pointerdown", (e: PointerEvent) => {
                 const target = e.target as HTMLElement;
-                if (el === this.toolbar && target.closest("button,input,.pa-width")) return; // controls stay interactive
+                if (el === this.toolbar && target.closest("button,input,.zt-width")) return; // controls stay interactive
                 e.preventDefault();
                 e.stopPropagation();
                 const rect = el.getBoundingClientRect();
@@ -241,7 +241,7 @@ export class Palette {
 
     private btn(icon: string, title: string, onClick: () => void, cls = ""): HTMLButtonElement {
         const b = document.createElement("button");
-        b.className = `pa-btn ${cls}`.trim();
+        b.className = `zt-btn ${cls}`.trim();
         b.innerHTML = icon;
         b.title = title;
         b.setAttribute("aria-label", title);
@@ -265,10 +265,10 @@ export class Palette {
             range = {min: range.min, max, step: range.step};
         }
         const wrap = document.createElement("div");
-        wrap.className = "pa-width";
+        wrap.className = "zt-width";
 
         const dot = document.createElement("i");
-        dot.className = "pa-width__dot";
+        dot.className = "zt-width__dot";
         dot.style.background = dotColor;
         const setDot = (v: number) => {
             const d = Math.round(6 + ((v - range.min) / (range.max - range.min)) * 14);
@@ -277,7 +277,7 @@ export class Palette {
         };
 
         const sliderBox = document.createElement("div");
-        sliderBox.className = "pa-width__slider";
+        sliderBox.className = "zt-width__slider";
         const input = document.createElement("input");
         input.type = "range";
         input.min = String(range.min);
@@ -287,7 +287,7 @@ export class Palette {
         sliderBox.appendChild(input);
 
         const val = document.createElement("span");
-        val.className = "pa-width__val";
+        val.className = "zt-width__val";
         val.textContent = input.value;
         const syncTitle = () => {
             wrap.title = `${input.value}px`;
@@ -318,7 +318,7 @@ export class Palette {
 
         // tool buttons
         const toolsGroup = document.createElement("div");
-        toolsGroup.className = "pa-toolbar__group";
+        toolsGroup.className = "zt-toolbar__group";
         const toolDefs: Array<[ToolId, string, string]> = [
             ["pen", ICONS.penStroke, t("toolPen")],
             ["highlighter", ICONS.highlighter, t("toolHighlighter")],
@@ -327,7 +327,7 @@ export class Palette {
         ];
         for (const [id, icon, label] of toolDefs) {
             const b = this.btn(icon, label, () => this.deps.onSelectTool(id),
-                tool === id ? "pa-btn--active" : "");
+                tool === id ? "zt-btn--active" : "");
             toolsGroup.appendChild(b);
         }
         this.toolbar.appendChild(toolsGroup);
@@ -336,13 +336,13 @@ export class Palette {
 
         // contextual options
         const options = document.createElement("div");
-        options.className = "pa-toolbar__options";
+        options.className = "zt-toolbar__options";
         if (tool === "pen" || tool === "highlighter") {
             const colors = tool === "pen" ? PEN_COLORS : HL_COLORS;
             const activeColor = tool === "pen" ? cfg.penColor : cfg.hlColor;
             for (const c of colors) {
                 const sw = document.createElement("button");
-                sw.className = `pa-swatch ${c.toLowerCase() === activeColor.toLowerCase() ? "pa-swatch--active" : ""}`;
+                sw.className = `zt-swatch ${c.toLowerCase() === activeColor.toLowerCase() ? "zt-swatch--active" : ""}`;
                 sw.style.background = c;
                 sw.title = c;
                 sw.addEventListener("click", (e) => {
@@ -370,7 +370,7 @@ export class Palette {
         if (this.state.hasSelection) {
             this.toolbar.appendChild(this.sep());
             const selGroup = document.createElement("div");
-            selGroup.className = "pa-toolbar__selection";
+            selGroup.className = "zt-toolbar__selection";
             selGroup.appendChild(this.btn(ICONS.duplicate, this.deps.i18n("strokeDuplicate"), () => this.deps.onAction("dupSel")));
             selGroup.appendChild(this.btn(ICONS.trash, this.deps.i18n("strokeDelete"), () => this.deps.onAction("deleteSel")));
             selGroup.appendChild(this.btn(ICONS.check, this.deps.i18n("strokeDeselect"), () => this.deps.onAction("doneSel")));
@@ -381,7 +381,7 @@ export class Palette {
 
         // global actions
         const actionsGroup = document.createElement("div");
-        actionsGroup.className = "pa-toolbar__group";
+        actionsGroup.className = "zt-toolbar__group";
         const undoBtn = this.btn(ICONS.undo, this.deps.i18n("undo"), () => this.deps.onAction("undo"));
         (undoBtn as HTMLButtonElement & { disabled: boolean }).disabled = !this.state.canUndo;
         const redoBtn = this.btn(ICONS.redo, this.deps.i18n("redo"), () => this.deps.onAction("redo"));
@@ -412,7 +412,7 @@ export class Palette {
 
     private sep(): HTMLDivElement {
         const s = document.createElement("div");
-        s.className = "pa-toolbar__sep";
+        s.className = "zt-toolbar__sep";
         return s;
     }
 
@@ -422,7 +422,7 @@ export class Palette {
         this.state.mode = on;
         this.toolbar.style.display = on ? "" : "none";
         this.handle.style.display = on ? "none" : "";
-        this.handle.classList.toggle("pa-handle--on", on);
+        this.handle.classList.toggle("zt-handle--on", on);
         if (on) {
             if (this.dock === "free") this.placeDefaultIfFloating();
             else this.snapToDock();
@@ -437,7 +437,7 @@ export class Palette {
             prev.canRedo !== this.state.canRedo ||
             prev.hasSelection !== this.state.hasSelection;
         if (structural) this.renderToolbar();
-        this.handle.classList.toggle("pa-handle--on", this.state.mode);
+        this.handle.classList.toggle("zt-handle--on", this.state.mode);
     }
 
     /** force a full re-render (tool/color/width changes) */

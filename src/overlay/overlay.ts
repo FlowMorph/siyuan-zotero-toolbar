@@ -147,15 +147,15 @@ export class DocOverlay {
 
         this.root = document.createElement("div");
         // strokes stay visible in and out of drawing mode — never hide the root
-        this.root.className = "pa-overlay";
+        this.root.className = "zt-overlay";
         this.inkCanvas = document.createElement("canvas");
-        this.inkCanvas.className = "pa-canvas";
+        this.inkCanvas.className = "zt-canvas";
         this.hlCanvas = document.createElement("canvas");
-        this.hlCanvas.className = "pa-canvas pa-canvas--multiply";
+        this.hlCanvas.className = "zt-canvas zt-canvas--multiply";
         this.liveCanvas = document.createElement("canvas");
-        this.liveCanvas.className = "pa-canvas";
+        this.liveCanvas.className = "zt-canvas";
         this.capture = document.createElement("div");
-        this.capture.className = "pa-capture";
+        this.capture.className = "zt-capture";
         this.root.append(this.inkCanvas, this.hlCanvas, this.liveCanvas, this.capture);
         el.appendChild(this.root);
 
@@ -533,7 +533,7 @@ export class DocOverlay {
                 this.deps.onStateChange();
             }
         } catch (e) {
-            console.error("[pencil-annotation] load failed", e);
+            console.error("[zotero-toolbar] load failed", e);
         }
     }
 
@@ -598,7 +598,7 @@ export class DocOverlay {
 
     setMode(on: boolean) {
         this.mode = on;
-        this.capture.classList.toggle("pa-capture--active", on);
+        this.capture.classList.toggle("zt-capture--active", on);
         if (on) {
             this.updateGeometry();
             this.scheduleRedraw();

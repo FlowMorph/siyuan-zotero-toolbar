@@ -1,6 +1,9 @@
-node_modules/
-build/
-*.zip
 .DS_Store
+*.zip
+build
+build/
 dock-*.png
+node_modules
+node_modules/
+package.zip
 real-app-test.png

@@ -3,7 +3,7 @@ import type {PencilPayload} from "../engine/types";
 
 /**
  * Kernel-backed persistence. Doc payloads live in the plugin's private
- * petal directory (/data/storage/petal/pencil-annotation/<docId>.json),
+ * petal directory (/data/storage/petal/siyuan-zotero-toolbar/<docId>.json),
  * which participates in SiYuan's encrypted cloud sync — strokes written on
  * the iPad show up on the desktop and vice versa.
  */
@@ -31,7 +31,7 @@ export async function loadPayload(plugin: Plugin, docId: string): Promise<Pencil
         if (!Array.isArray(payload.strokes)) return null;
         return payload;
     } catch (e) {
-        console.error("[pencil-annotation] loadPayload failed", e);
+        console.error("[zotero-toolbar] loadPayload failed", e);
         return null;
     }
 }
@@ -41,7 +41,7 @@ export async function savePayload(plugin: Plugin, payload: PencilPayload): Promi
         await withTimeout(plugin.saveData(storageName(payload.docId), payload), SAVE_TIMEOUT);
         return true;
     } catch (e) {
-        console.error("[pencil-annotation] savePayload failed", e);
+        console.error("[zotero-toolbar] savePayload failed", e);
         return false;
     }
 }

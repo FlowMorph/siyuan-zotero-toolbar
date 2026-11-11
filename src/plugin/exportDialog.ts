@@ -11,29 +11,29 @@ export function exportStrokesDialog(overlay: DocOverlay, t: I18nFn) {
 
     const dialog = new Dialog({
         title: t("exportTitle"),
-        content: `<div class="pa-export">
+        content: `<div class="zt-export">
             <div class="b3-label config-item">
                 <div class="fn__block">
                     <div class="config-name">${t("exportInkSection")}</div>
                     <div class="b3-label__text">${t("exportInkDesc")}</div>
                     <div class="fn__hr"></div>
-                    <div class="pa-export__radios">
-                        <label class="pa-export__radio">
-                            <input class="b3-radio" type="radio" name="pa-export-bg" value="white" checked>
+                    <div class="zt-export__radios">
+                        <label class="zt-export__radio">
+                            <input class="b3-radio" type="radio" name="zt-export-bg" value="white" checked>
                             <span>${t("exportBgWhite")}</span>
                         </label>
-                        <label class="pa-export__radio">
-                            <input class="b3-radio" type="radio" name="pa-export-bg" value="transparent">
+                        <label class="zt-export__radio">
+                            <input class="b3-radio" type="radio" name="zt-export-bg" value="transparent">
                             <span>${t("exportBgTransparent")}</span>
                         </label>
                     </div>
-                    <div class="pa-export__row">
+                    <div class="zt-export__row">
                         <button class="b3-button b3-button--outline" data-action="save"
                             ${hasInk ? "" : "disabled"}><span>${t("exportSaveOnly")}</span></button>
                         <button class="b3-button b3-button--outline" data-action="insert"
                             ${hasInk ? "" : "disabled"}><span>${t("exportInsert")}</span></button>
                     </div>
-                    ${hasInk ? "" : `<div class="pa-export__note b3-label__text">${t("exportNone")}</div>`}
+                    ${hasInk ? "" : `<div class="zt-export__note b3-label__text">${t("exportNone")}</div>`}
                 </div>
             </div>
             <div class="b3-label config-item">
@@ -41,7 +41,7 @@ export function exportStrokesDialog(overlay: DocOverlay, t: I18nFn) {
                     <div class="config-name">${t("exportPdfSection")}</div>
                     <div class="b3-label__text">${t("exportPdfHint")}</div>
                     <div class="fn__hr"></div>
-                    <button class="b3-button pa-export__pdf" data-action="pdf">
+                    <button class="b3-button zt-export__pdf" data-action="pdf">
                         <span>${t("exportPdf")}</span>
                     </button>
                 </div>
@@ -52,11 +52,11 @@ export function exportStrokesDialog(overlay: DocOverlay, t: I18nFn) {
 
     const el = dialog.element;
     const bg = (): "white" | "transparent" =>
-        el.querySelector<HTMLInputElement>('input[name="pa-export-bg"]:checked')?.value === "transparent"
+        el.querySelector<HTMLInputElement>('input[name="zt-export-bg"]:checked')?.value === "transparent"
             ? "transparent" : "white";
 
     const busy = (on: boolean) => {
-        el.querySelectorAll<HTMLButtonElement>(".pa-export button[data-action]")
+        el.querySelectorAll<HTMLButtonElement>(".zt-export button[data-action]")
             .forEach((b) => (b.disabled = on || (b.dataset.action !== "pdf" && !hasInk)));
     };
 
@@ -73,7 +73,7 @@ export function exportStrokesDialog(overlay: DocOverlay, t: I18nFn) {
             showMessage(t("exportDone", {path}));
             dialog.destroy();
         } catch (e) {
-            console.error("[pencil-annotation] export failed", e);
+            console.error("[zotero-toolbar] export failed", e);
             showMessage(t("exportFailed", {msg: String((e as Error).message || e)}), undefined, "error");
             busy(false);
         }
@@ -99,7 +99,7 @@ export function exportStrokesDialog(overlay: DocOverlay, t: I18nFn) {
                 busy(false);
                 return;
             }
-            console.error("[pencil-annotation] pdf export failed", e);
+            console.error("[zotero-toolbar] pdf export failed", e);
             showMessage(t("exportFailed", {msg: String((e as Error).message || e)}), undefined, "error");
             if (btn) btn.textContent = label;
             busy(false);

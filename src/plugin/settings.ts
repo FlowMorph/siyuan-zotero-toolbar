@@ -41,7 +41,7 @@ export async function loadSettings(plugin: Plugin): Promise<PencilSettings> {
 
 export function saveSettings(plugin: Plugin, settings: PencilSettings): void {
     void plugin.saveData(SETTINGS_NAME, settings).catch((e) =>
-        console.error("[pencil-annotation] saveSettings failed", e));
+        console.error("[zotero-toolbar] saveSettings failed", e));
 }
 
 /** Per-device session state: active tool + last used colors/widths. */
@@ -54,7 +54,7 @@ export interface SessionConfig {
     eraserRadius?: number;
 }
 
-const SESSION_KEY = "pencil-annotation.session";
+const SESSION_KEY = "zotero-toolbar.session";
 
 export function loadSession(): SessionConfig {
     try {

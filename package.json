@@ -1,7 +1,7 @@
 {
-  "name": "pencil-annotation",
-  "version": "0.3.0",
-  "description": "Apple Pencil handwriting / annotation layer for SiYuan documents",
+  "name": "siyuan-zotero-toolbar",
+  "version": "0.1.0",
+  "description": "Zotero-style annotation toolbar for SiYuan documents",
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --mode development",
@@ -14,15 +14,17 @@
   "keywords": [
     "siyuan",
     "plugin",
-    "draw",
-    "pencil",
-    "handwriting",
-    "annotation"
+    "zotero",
+    "annotation",
+    "sticky-note",
+    "draw"
   ],
   "license": "MIT",
   "devDependencies": {
+    "playwright-core": "^1.65.0",
     "typescript": "^5.6.0",
-    "vite": "^5.4.0"
+    "vite": "^5.4.0",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "jspdf": "^4.2.1",

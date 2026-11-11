@@ -147,7 +147,7 @@ function log(msg: string) {
     logEl.scrollTop = logEl.scrollHeight;
 }
 
-const captureEl = () => overlay.root.querySelector(".pa-capture") as HTMLElement;
+const captureEl = () => overlay.root.querySelector(".zt-capture") as HTMLElement;
 
 let pointerSeq = 100;
 function fire(el: HTMLElement, type: string, x: number, y: number, opts: {pointerType?: string; pressure?: number; pointerId?: number} = {}) {
