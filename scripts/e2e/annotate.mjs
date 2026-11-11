@@ -94,6 +94,27 @@ try {
     check("点别处关闭菜单", await page.locator(".zt-pop").count() === 0);
     await page.screenshot({path: `${SHOT}-toolbar.png`});
 
+    // tapping the active tool again opens its options beside that button
+    await tool("选择");
+    await tool("钢笔");
+    check("第一次点工具只切换、不弹面板", await page.locator(".zt-pop").count() === 0);
+    const penBtn = page.locator('.zt-toolbar button[title="钢笔"]');
+    const pb0 = await penBtn.boundingBox();
+    await penBtn.click();
+    await page.waitForTimeout(150);
+    const pop0 = await page.locator(".zt-pop").boundingBox().catch(() => null);
+    check("再点当前工具在原位弹出二级面板", !!pop0 && await page.locator(".zt-pop .zt-swatch").count() === 8 &&
+        Math.abs((pop0.y + pop0.height / 2) - (pb0.y + pb0.height / 2)) < pop0.height / 2, {pop0, pb0});
+    await page.locator(".zt-pop input[type=range]").fill("8");
+    await page.waitForTimeout(100);
+    check("调粗细后面板仍在原位", await page.locator(".zt-pop").count() === 1);
+    await penBtn.click();
+    await page.waitForTimeout(150);
+    check("第三次点同一工具收起面板", await page.locator(".zt-pop").count() === 0);
+    await tool("选择");
+    await tool("选择");
+    check("选择工具再点不弹面板", await page.locator(".zt-pop").count() === 0);
+
     const shapeKind = async (title) => {
         await tool("颜色与粗细");
         await page.click(`.zt-pop button[title="${title}"]`);

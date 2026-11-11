@@ -64,6 +64,9 @@ const savePos = (key: string, pos: { x: number; y: number }) => {
 
 type PopoverKind = "options" | "menu";
 
+/** tools whose button, tapped again while active, opens the options popover */
+const TOOLS_WITH_OPTIONS: ReadonlySet<ToolId> = new Set(["highlighter", "pen", "shape", "note", "eraser"]);
+
 /**
  * Zotero-style vertical toolbar: icon-only tools, one color dot that opens a
  * secondary popover (color grid, width, shape kind), then undo / redo /
@@ -78,6 +81,8 @@ export class Palette {
     private suppressClick = false;
     private popover: HTMLDivElement | null = null;
     private popoverKind: PopoverKind | null = null;
+    /** data-anchor of the button the popover hangs off (tool button, dot or ⋯) */
+    private popoverAnchor: string | null = null;
 
     constructor(deps: PaletteDeps) {
         this.deps = deps;
@@ -203,8 +208,13 @@ export class Palette {
             ["eraser", ICONS.eraser, t("toolEraser")],
         ];
         for (const [id, icon, label] of toolDefs) {
-            this.toolbar.appendChild(this.btn(icon, label, () => this.deps.onSelectTool(id),
-                tool === id ? "zt-btn--active" : ""));
+            // tapping the active tool again opens its options right beside it
+            const b = this.btn(icon, label, (el) => {
+                if (tool === id && TOOLS_WITH_OPTIONS.has(id)) this.togglePopover("options", el);
+                else this.deps.onSelectTool(id);
+            }, tool === id ? "zt-btn--active" : "");
+            b.dataset.anchor = `tool:${id}`;
+            this.toolbar.appendChild(b);
         }
 
         // the secondary slot: selection actions, or the options dot
@@ -213,6 +223,7 @@ export class Palette {
             this.toolbar.appendChild(this.btn(ICONS.trash, t("strokeDelete"), () => this.deps.onAction("deleteSel")));
         } else if (tool !== "select") {
             const dot = this.btn("", t("toolOptions"), (b) => this.togglePopover("options", b), "zt-btn--dot");
+            dot.dataset.anchor = "dot";
             const swatch = document.createElement("i");
             swatch.className = "zt-dot";
             const color = this.activeColor();
@@ -235,10 +246,12 @@ export class Palette {
         drag.className = "zt-toolbar__drag";
         drag.innerHTML = ICONS.menu;
         drag.title = t("dragToolbar");
+        const more = this.btn(ICONS.more, t("more"), (b) => this.togglePopover("menu", b));
+        more.dataset.anchor = "more";
         this.toolbar.append(
             undo,
             redo,
-            this.btn(ICONS.more, t("more"), (b) => this.togglePopover("menu", b)),
+            more,
             this.btn(ICONS.closeCircle, t("collapse"), () => this.deps.onAction("collapse")),
             drag,
         );
@@ -260,7 +273,7 @@ export class Palette {
     // ------------------------------------------------------------- popover
 
     private togglePopover(kind: PopoverKind, anchor: HTMLElement) {
-        if (this.popoverKind === kind) {
+        if (this.popover && this.popoverAnchor === anchor.dataset.anchor) {
             this.closePopover();
             return;
         }
@@ -277,6 +290,7 @@ export class Palette {
         document.body.appendChild(pop);
         this.popover = pop;
         this.popoverKind = kind;
+        this.popoverAnchor = anchor.dataset.anchor ?? null;
         anchor.classList.add("zt-btn--open");
         this.positionPopover(anchor);
         document.addEventListener("pointerdown", this.onOutside, true);
@@ -289,6 +303,7 @@ export class Palette {
         this.popover.remove();
         this.popover = null;
         this.popoverKind = null;
+        this.popoverAnchor = null;
         this.toolbar.querySelectorAll(".zt-btn--open").forEach((b) => b.classList.remove("zt-btn--open"));
         document.removeEventListener("pointerdown", this.onOutside, true);
         window.removeEventListener("keydown", this.onPopoverKey, true);
@@ -473,10 +488,12 @@ export class Palette {
     /** re-render after tool/color/shape changes; an open options popover stays open */
     refresh() {
         const kind = this.popoverKind;
+        const key = this.popoverAnchor;
         this.closePopover();
         this.renderToolbar();
         if (kind === "options") {
-            const anchor = this.toolbar.querySelector<HTMLElement>(".zt-btn--dot");
+            const anchor = this.toolbar.querySelector<HTMLElement>(`[data-anchor="${key}"]`) ??
+                this.toolbar.querySelector<HTMLElement>(".zt-btn--dot");
             if (anchor) this.openPopover(kind, anchor);
         }
     }

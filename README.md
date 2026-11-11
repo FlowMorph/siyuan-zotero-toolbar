@@ -6,7 +6,7 @@ Bring Zotero's annotation toolbar to SiYuan: annotate any document with a pen, h
 
 ## Features
 
-The toolbar mirrors Zotero: a vertical, icon-only strip. The color dot opens a popover for color, size and shape kind, export, clear and settings live under ⋯, and ≡ at the bottom is the drag handle. Tools, in order:
+The toolbar mirrors Zotero: a vertical, icon-only strip. The color dot (or tapping the active tool again) opens a popover for color, size and shape kind, export, clear and settings live under ⋯, and ≡ at the bottom is the drag handle. Tools, in order:
 
 | Tool | What it does |
 |---|---|
