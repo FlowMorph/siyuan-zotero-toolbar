@@ -57,8 +57,19 @@ try {
     const toast = await page.evaluate(() => document.querySelector("#message")?.textContent || "");
     check("切换模式不弹提示", !toast.includes("批注模式"), toast);
     const titles = await page.locator(".zt-toolbar button").evaluateAll((bs) => bs.map((b) => b.title));
-    check("竖排工具栏：Zotero 顺序 + 颜色点 + 撤销/重做/关闭/菜单",
-        JSON.stringify(titles) === JSON.stringify(["选择", "荧光笔", "钢笔", "形状", "便笺", "橡皮擦", "颜色与粗细", "撤销", "重做", "收起工具栏", "更多"]), titles);
+    check("竖排工具栏：Zotero 顺序 + 颜色点 + 撤销/重做/更多/关闭",
+        JSON.stringify(titles) === JSON.stringify(["选择", "荧光笔", "钢笔", "形状", "便笺", "橡皮擦", "颜色与粗细", "撤销", "重做", "更多", "收起工具栏"]), titles);
+    const isLast = await page.evaluate(() => document.querySelector(".zt-toolbar").lastElementChild.classList.contains("zt-toolbar__drag"));
+    check("最底部的 ≡ 是拖动手柄", isLast);
+    const tb0 = await page.locator(".zt-toolbar").boundingBox();
+    const hb = await page.locator(".zt-toolbar__drag").boundingBox();
+    await page.locator(".zt-toolbar__drag").click();
+    await page.waitForTimeout(150);
+    check("点 ≡ 不弹任何面板", await page.locator(".zt-pop").count() === 0);
+    await drag({x: hb.x + hb.width / 2, y: hb.y + hb.height / 2}, {x: hb.x + hb.width / 2 + 120, y: hb.y + hb.height / 2 - 40});
+    const tb1 = await page.locator(".zt-toolbar").boundingBox();
+    check("拖 ≡ 移动整条工具栏", Math.abs(tb1.x - tb0.x - 120) < 2 && Math.abs(tb1.y - tb0.y + 40) < 2, {tb0, tb1});
+    await drag({x: hb.x + hb.width / 2 + 120, y: hb.y + hb.height / 2 - 40}, {x: hb.x + hb.width / 2, y: hb.y + hb.height / 2});
     check("工具栏只有图标没有文字", (await page.locator(".zt-toolbar").innerText()).trim() === "");
 
     // color dot → secondary popover

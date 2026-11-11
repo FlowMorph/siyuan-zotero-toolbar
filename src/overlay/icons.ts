@@ -51,6 +51,7 @@ export const ICONS = {
     close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
     closeCircle: svg('<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>'),
     menu: svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+    more: svg('<circle cx="5.5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor"/>'),
     collapse: svg('<path d="m9 5 7 7-7 7"/>'),
     pencilHandle: svg(
         '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z" fill="currentColor" stroke="none"/>' +

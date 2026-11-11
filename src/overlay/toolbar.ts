@@ -193,10 +193,6 @@ export class Palette {
         const tool = this.deps.config.tool;
         this.toolbar.innerHTML = "";
 
-        const grip = document.createElement("div");
-        grip.className = "zt-toolbar__grip";
-        this.toolbar.appendChild(grip);
-
         // Zotero's order: select, highlight, draw, shapes, note, eraser
         const toolDefs: Array<[ToolId, string, string]> = [
             ["select", ICONS.select, t("toolSelect")],
@@ -234,11 +230,17 @@ export class Palette {
         undo.disabled = !this.state.canUndo;
         const redo = this.btn(ICONS.redo, t("redo"), () => this.deps.onAction("redo"));
         redo.disabled = !this.state.canRedo;
+        // like Zotero, ≡ at the bottom is the drag handle (not a button)
+        const drag = document.createElement("div");
+        drag.className = "zt-toolbar__drag";
+        drag.innerHTML = ICONS.menu;
+        drag.title = t("dragToolbar");
         this.toolbar.append(
             undo,
             redo,
+            this.btn(ICONS.more, t("more"), (b) => this.togglePopover("menu", b)),
             this.btn(ICONS.closeCircle, t("collapse"), () => this.deps.onAction("collapse")),
-            this.btn(ICONS.menu, t("more"), (b) => this.togglePopover("menu", b)),
+            drag,
         );
 
         if (this.toolbar.style.left) this.place(this.toolbar, this.currentPos(this.toolbar));

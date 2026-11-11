@@ -67,5 +67,6 @@
   "shape": "Shapes",
   "note": "Sticky note",
   "toolOptions": "Color & size",
-  "more": "More"
+  "more": "More",
+  "dragToolbar": "Drag to move"
 }
